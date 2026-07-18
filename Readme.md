@@ -156,10 +156,10 @@ GameVault/
 
 ## Version 0.4
 
-* [ ] Big Picture Mode
-* [ ] Controller navigation
-* [ ] Focus management
-* [ ] Sound effects
+* [x] Big Picture Mode
+* [x] Controller navigation
+* [x] Focus management
+* [x] Sound effects
 
 ## Version 1.0
 
