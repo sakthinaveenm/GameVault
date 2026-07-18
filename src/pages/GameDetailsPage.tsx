@@ -158,6 +158,11 @@ export function GameDetailsPage({
           </div>
 
           <div className="flex-1 pb-2">
+            <div className="mb-3">
+              <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest badge-${game.platform}`}>
+                {game.platform === "local" ? "Local Executable" : `${game.platform === "gog" ? "GOG GALAXY" : game.platform.toUpperCase()} INTEGRATION`}
+              </span>
+            </div>
             <h1 className="text-5xl font-black tracking-tight">{game.title}</h1>
             <p className="text-xs text-zinc-500 font-mono mt-2 truncate" title={game.executablePath}>
               {game.executablePath}

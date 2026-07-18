@@ -15,6 +15,8 @@ export type Game = {
   publisher?: string | null;
   genres?: string | null;
   releaseDate?: string | null;
+  platform: string;
+  platformGameId?: string | null;
 };
 
 export type Profile = {
@@ -97,6 +99,14 @@ const migrations = [
       INSERT INTO profiles (id, display_name) VALUES (1, 'Player 1');
     `,
   },
+  {
+    version: 5,
+    name: "add_platform_fields",
+    up: `
+      ALTER TABLE games ADD COLUMN platform TEXT NOT NULL DEFAULT 'local';
+      ALTER TABLE games ADD COLUMN platform_game_id TEXT;
+    `,
+  },
 ] as const;
 
 export class Database {
@@ -143,7 +153,7 @@ export class Database {
 
   getGames(): Game[] {
     const rows = this.connection.prepare(`
-      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite, description, cover_path, developer, publisher, genres, release_date
+      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite, description, cover_path, developer, publisher, genres, release_date, platform, platform_game_id
       FROM games
       ORDER BY title COLLATE NOCASE ASC
     `).all() as Array<{
@@ -160,6 +170,8 @@ export class Database {
       publisher: string | null;
       genres: string | null;
       release_date: string | null;
+      platform: string;
+      platform_game_id: string | null;
     }>;
 
     return rows.map((game) => ({
@@ -176,7 +188,60 @@ export class Database {
       publisher: game.publisher,
       genres: game.genres,
       releaseDate: game.release_date,
+      platform: game.platform,
+      platformGameId: game.platform_game_id,
     }));
+  }
+
+  importPlatformGames(games: Array<{
+    title: string;
+    executablePath: string;
+    platform: string;
+    platformGameId: string;
+    description?: string;
+    coverPath?: string;
+    developer?: string;
+    publisher?: string;
+    genres?: string;
+    releaseDate?: string;
+  }>): number {
+    if (games.length === 0) return 0;
+    const upsertGame = this.connection.prepare(`
+      INSERT INTO games (title, executable_path, platform, platform_game_id, description, cover_path, developer, publisher, genres, release_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(executable_path) DO UPDATE SET
+        title = excluded.title,
+        platform = excluded.platform,
+        platform_game_id = excluded.platform_game_id,
+        description = COALESCE(excluded.description, description),
+        cover_path = COALESCE(excluded.cover_path, cover_path),
+        developer = COALESCE(excluded.developer, developer),
+        publisher = COALESCE(excluded.publisher, publisher),
+        genres = COALESCE(excluded.genres, genres),
+        release_date = COALESCE(excluded.release_date, release_date)
+    `);
+    const importAll = this.connection.transaction((entries: any[]) => {
+      for (const game of entries) {
+        upsertGame.run(
+          game.title.trim(),
+          game.executablePath,
+          game.platform,
+          game.platformGameId,
+          game.description || null,
+          game.coverPath || null,
+          game.developer || null,
+          game.publisher || null,
+          game.genres || null,
+          game.releaseDate || null
+        );
+      }
+    });
+    importAll(games);
+    return games.length;
+  }
+
+  clearPlatformGames(): void {
+    this.connection.prepare("DELETE FROM games WHERE platform != 'local'").run();
   }
 
   setGameFavorite(gameId: number, isFavorite: boolean): void {

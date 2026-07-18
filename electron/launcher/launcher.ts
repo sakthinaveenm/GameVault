@@ -1,12 +1,13 @@
-import { spawn } from "node:child_process";
-import { BrowserWindow } from "electron";
+import { spawn, exec } from "node:child_process";
+import { BrowserWindow, shell } from "electron";
 import type { Database } from "../database/database.js";
 
 // Keep track of any currently running game session
 let activeSession: {
   gameId: number;
   startTime: number;
-  process: ReturnType<typeof spawn>;
+  process?: ReturnType<typeof spawn>;
+  pollingInterval?: ReturnType<typeof setInterval>;
 } | null = null;
 
 export function getRunningGameId(): number | null {
@@ -26,49 +27,111 @@ export function launchGame(database: Database, gameId: number): void {
   // Update last played timestamp immediately
   database.recordGameStart(gameId);
 
-  const isMacApp = process.platform === "darwin" && game.executablePath.endsWith(".app");
-  let child;
-
-  if (isMacApp) {
-    // On macOS, open -W waits for the app to terminate
-    child = spawn("open", ["-W", game.executablePath]);
-  } else {
-    // Run the executable directly
-    child = spawn(game.executablePath, [], {
-      detached: true,
-      stdio: "ignore",
-    });
-  }
-
   const startTime = Date.now();
-  activeSession = {
-    gameId,
-    startTime,
-    process: child,
-  };
 
-  // Notify UI that the game has started
-  sendGameStatus(gameId, "started");
+  if (game.platform === "local") {
+    const isMacApp = process.platform === "darwin" && game.executablePath.endsWith(".app");
+    let child;
 
-  const onExit = () => {
-    if (activeSession && activeSession.gameId === gameId) {
-      const durationSeconds = Math.round((Date.now() - startTime) / 1000);
-      if (durationSeconds > 0) {
-        database.incrementPlaytime(gameId, durationSeconds);
+    if (isMacApp) {
+      // On macOS, open -W waits for the app to terminate
+      child = spawn("open", ["-W", game.executablePath]);
+    } else {
+      // Run the executable directly
+      child = spawn(game.executablePath, [], {
+        detached: true,
+        stdio: "ignore",
+      });
+    }
+
+    activeSession = {
+      gameId,
+      startTime,
+      process: child,
+    };
+
+    // Notify UI that the game has started
+    sendGameStatus(gameId, "started");
+
+    const onExit = () => {
+      if (activeSession && activeSession.gameId === gameId) {
+        const durationSeconds = Math.round((Date.now() - startTime) / 1000);
+        if (durationSeconds > 0) {
+          database.incrementPlaytime(gameId, durationSeconds);
+        }
+        activeSession = null;
+        sendGameStatus(gameId, "stopped", durationSeconds);
       }
-      activeSession = null;
-      sendGameStatus(gameId, "stopped", durationSeconds);
-    }
-  };
+    };
 
-  child.on("exit", onExit);
-  child.on("error", (err) => {
-    console.error("Failed to launch game process:", err);
-    if (activeSession && activeSession.gameId === gameId) {
-      activeSession = null;
-      sendGameStatus(gameId, "error");
-    }
-  });
+    child.on("exit", onExit);
+    child.on("error", (err) => {
+      console.error("Failed to launch local game process:", err);
+      if (activeSession && activeSession.gameId === gameId) {
+        activeSession = null;
+        sendGameStatus(gameId, "error");
+      }
+    });
+  } else {
+    // Launch game via Launcher protocol URL (Steam, GOG, Epic)
+    shell.openExternal(game.executablePath).catch((err) => {
+      console.error("Failed to trigger launcher protocol:", err);
+    });
+
+    // Notify UI immediately
+    sendGameStatus(gameId, "started");
+
+    // Resolve binary name to poll using pgrep
+    let binaryName = game.title;
+    const lowerTitle = game.title.toLowerCase();
+    if (lowerTitle.includes("portal 2")) binaryName = "portal2";
+    else if (lowerTitle.includes("hades")) binaryName = "hades";
+    else if (lowerTitle.includes("celeste")) binaryName = "Celeste";
+    else if (lowerTitle.includes("witcher 3")) binaryName = "witcher3";
+
+    let hasStarted = false;
+    let waitPolls = 0;
+    const maxWaitPolls = 12; // 60 seconds timeout waiting for launch
+
+    const pollingInterval = setInterval(() => {
+      exec(`pgrep -f "${binaryName}"`, (err, stdout) => {
+        const isRunning = !err && stdout.trim().length > 0;
+
+        if (!hasStarted) {
+          waitPolls++;
+          if (isRunning) {
+            hasStarted = true;
+          } else if (waitPolls >= maxWaitPolls) {
+            // Game failed to start or exited immediately
+            clearInterval(pollingInterval);
+            if (activeSession && activeSession.gameId === gameId) {
+              activeSession = null;
+              sendGameStatus(gameId, "stopped", 0);
+            }
+          }
+        } else {
+          // Game has been launched and was running, now closed
+          if (!isRunning) {
+            clearInterval(pollingInterval);
+            if (activeSession && activeSession.gameId === gameId) {
+              const durationSeconds = Math.round((Date.now() - startTime) / 1000);
+              if (durationSeconds > 0) {
+                database.incrementPlaytime(gameId, durationSeconds);
+              }
+              activeSession = null;
+              sendGameStatus(gameId, "stopped", durationSeconds);
+            }
+          }
+        }
+      });
+    }, 5000);
+
+    activeSession = {
+      gameId,
+      startTime,
+      pollingInterval,
+    };
+  }
 }
 
 function sendGameStatus(gameId: number, status: "started" | "stopped" | "error", sessionDuration?: number) {

@@ -2,6 +2,7 @@ import { dialog, ipcMain } from "electron";
 import type { Database } from "../database/database.js";
 import { scanForGames } from "../services/game-scanner.js";
 import { launchGame } from "../launcher/launcher.js";
+import { scanSteamGames, scanEpicGames, scanGogGames, getMockPlatformGames } from "../services/platform-scanner.js";
 
 export function registerAppIpc(database: Database): void {
   ipcMain.handle("app:get-info", () => ({
@@ -64,5 +65,30 @@ export function registerAppIpc(database: Database): void {
       throw new Error("Invalid request.");
     }
     database.updateGameMetadata(gameId, metadata as any);
+  });
+
+  // Sync Platforms Handlers
+  ipcMain.handle("library:sync-platforms", async () => {
+    const steamGames = await scanSteamGames();
+    const epicGames = await scanEpicGames();
+    const gogGames = await scanGogGames();
+
+    const allGames = [...steamGames, ...epicGames, ...gogGames];
+    let imported = 0;
+    if (allGames.length > 0) {
+      imported = database.importPlatformGames(allGames);
+    }
+    return { imported };
+  });
+
+  // Toggle Sandbox Mode Handler
+  ipcMain.handle("profile:toggle-sandbox", (_event, enabled: unknown) => {
+    if (typeof enabled !== "boolean") throw new Error("Invalid request.");
+    if (enabled) {
+      const mockGames = getMockPlatformGames();
+      database.importPlatformGames(mockGames);
+    } else {
+      database.clearPlatformGames();
+    }
   });
 }

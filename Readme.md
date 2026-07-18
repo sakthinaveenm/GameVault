@@ -209,11 +209,11 @@ GameVault/
 
 ## Version 1.0
 
-* [ ] Steam integration
-* [ ] Epic integration
-* [ ] GOG integration
-* [ ] Platform management
-* [ ] Stable release
+* [x] Steam integration
+* [x] Epic integration
+* [x] GOG integration
+* [x] Platform management
+* [x] Stable release
 
 ---
 

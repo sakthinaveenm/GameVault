@@ -18,10 +18,12 @@ declare global {
       getProfile: () => Promise<Profile>;
       updateProfile: (name: string, avatarPath: string | null) => Promise<void>;
       updateSettings: (theme: string, accentColor: string, startInFullscreen: boolean) => Promise<void>;
+      toggleSandboxMode: (enabled: boolean) => Promise<void>;
 
       // Game Launcher & Metadata
       launchGame: (gameId: number) => Promise<void>;
       updateGameMetadata: (gameId: number, metadata: Partial<Game>) => Promise<void>;
+      syncPlatforms: () => Promise<{ imported: number }>;
 
       // Events
       onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => () => void;
@@ -43,6 +45,8 @@ export type Game = {
   publisher?: string | null;
   genres?: string | null;
   releaseDate?: string | null;
+  platform: string;
+  platformGameId?: string | null;
 };
 
 export type Profile = {

@@ -113,3 +113,25 @@ button {
 .theme-light ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
 }
+
+/* Platform Badges */
+.badge-steam {
+  background: linear-gradient(135deg, #171a21, #1b2838) !important;
+  color: #66c0f4 !important;
+  border: 1px solid rgba(102, 192, 244, 0.2) !important;
+}
+.badge-epic {
+  background: linear-gradient(135deg, #121212, #202020) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+.badge-gog {
+  background: linear-gradient(135deg, #1d082e, #361159) !important;
+  color: #bf8df2 !important;
+  border: 1px solid rgba(191, 141, 242, 0.2) !important;
+}
+.badge-local {
+  background: linear-gradient(135deg, #18181b, #27272a) !important;
+  color: #a1a1aa !important;
+  border: 1px solid rgba(161, 161, 170, 0.15) !important;
+}
