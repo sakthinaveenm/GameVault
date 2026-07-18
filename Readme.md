@@ -4,6 +4,8 @@
 
 GameVault is a modern, high-performance desktop game launcher built with **Electron**, **React**, and **TypeScript**. It provides a beautiful game library experience inspired by modern gaming platforms while remaining lightweight, customizable, and controller-friendly.
 
+> **Development note:** GameVault is currently being built with AI assistance.
+
 ---
 
 ## ✨ Features
@@ -131,11 +133,11 @@ GameVault/
 
 ## Version 0.1
 
-* [ ] Electron setup
-* [ ] React + TypeScript
-* [ ] Tailwind CSS
-* [ ] SQLite integration
-* [ ] Basic application shell
+* [x] Electron setup
+* [x] React + TypeScript
+* [x] Tailwind CSS
+* [x] SQLite integration
+* [x] Basic application shell
 
 ## Version 0.2
 
