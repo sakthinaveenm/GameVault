@@ -150,9 +150,9 @@ GameVault/
 
 * [ ] Metadata
 * [ ] Artwork
-* [ ] Search
-* [ ] Filters
-* [ ] Collections
+* [x] Search
+* [x] Filters
+* [x] Collections
 
 ## Version 0.4
 

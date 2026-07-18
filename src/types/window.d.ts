@@ -9,7 +9,10 @@ declare global {
         databaseReady: boolean;
       }>;
       getGames: () => Promise<Game[]>;
+      getLibraryState: () => Promise<LibraryState>;
       chooseAndImportGames: () => Promise<{ canceled: boolean; imported: number }>;
+      setGameFavorite: (gameId: number, isFavorite: boolean) => Promise<void>;
+      createCollection: (name: string) => Promise<Collection>;
     };
   }
 }
@@ -23,3 +26,6 @@ type Game = {
   playtimeSeconds: number;
   isFavorite: boolean;
 };
+
+type Collection = { id: number; name: string; gameCount: number };
+type LibraryState = { games: Game[]; collections: Collection[] };

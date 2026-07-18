@@ -13,6 +13,12 @@ export type Game = {
 
 export type GameImport = Pick<Game, "title" | "executablePath">;
 
+export type Collection = {
+  id: number;
+  name: string;
+  gameCount: number;
+};
+
 const migrations = [
   {
     version: 1,
@@ -29,6 +35,35 @@ const migrations = [
       );
       CREATE INDEX idx_games_title ON games(title COLLATE NOCASE);
       CREATE INDEX idx_games_last_played ON games(last_played_at DESC);
+    `,
+  },
+  {
+    version: 2,
+    name: "add_game_metadata_fields",
+    up: `
+      ALTER TABLE games ADD COLUMN description TEXT;
+      ALTER TABLE games ADD COLUMN cover_path TEXT;
+      ALTER TABLE games ADD COLUMN developer TEXT;
+      ALTER TABLE games ADD COLUMN publisher TEXT;
+      ALTER TABLE games ADD COLUMN genres TEXT;
+      ALTER TABLE games ADD COLUMN release_date TEXT;
+    `,
+  },
+  {
+    version: 3,
+    name: "create_collections",
+    up: `
+      CREATE TABLE collections (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE collection_games (
+        collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+        game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        PRIMARY KEY (collection_id, game_id)
+      );
+      CREATE INDEX idx_collection_games_game ON collection_games(game_id);
     `,
   },
 ] as const;
@@ -99,6 +134,31 @@ export class Database {
       playtimeSeconds: game.playtime_seconds,
       isFavorite: game.is_favorite === 1,
     }));
+  }
+
+  setGameFavorite(gameId: number, isFavorite: boolean): void {
+    if (!Number.isSafeInteger(gameId) || gameId < 1) throw new Error("Invalid game.");
+    this.connection.prepare("UPDATE games SET is_favorite = ? WHERE id = ?").run(isFavorite ? 1 : 0, gameId);
+  }
+
+  getCollections(): Collection[] {
+    const rows = this.connection.prepare(`
+      SELECT collections.id, collections.name, COUNT(collection_games.game_id) AS game_count
+      FROM collections
+      LEFT JOIN collection_games ON collection_games.collection_id = collections.id
+      GROUP BY collections.id
+      ORDER BY collections.name COLLATE NOCASE ASC
+    `).all() as Array<{ id: number; name: string; game_count: number }>;
+
+    return rows.map((collection) => ({ id: collection.id, name: collection.name, gameCount: collection.game_count }));
+  }
+
+  createCollection(name: string): Collection {
+    const trimmedName = name.trim();
+    if (trimmedName.length < 1 || trimmedName.length > 60) throw new Error("Collection names must be 1–60 characters.");
+
+    const result = this.connection.prepare("INSERT INTO collections (name) VALUES (?)").run(trimmedName);
+    return { id: Number(result.lastInsertRowid), name: trimmedName, gameCount: 0 };
   }
 
   private runMigrations(): void {

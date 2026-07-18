@@ -5,14 +5,14 @@ type AppInfo = Awaited<ReturnType<typeof window.gameVault.getAppInfo>>;
 
 export function App() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
-  const [games, setGames] = useState<Game[]>([]);
+  const [library, setLibrary] = useState<LibraryState>({ games: [], collections: [] });
 
   useEffect(() => {
-    void Promise.all([window.gameVault.getAppInfo(), window.gameVault.getGames()]).then(([info, library]) => {
+    void Promise.all([window.gameVault.getAppInfo(), window.gameVault.getLibraryState()]).then(([info, state]) => {
       setAppInfo(info);
-      setGames(library);
+      setLibrary(state);
     });
   }, []);
 
-  return <LibraryPage appInfo={appInfo} games={games} onGamesImported={setGames} />;
+  return <LibraryPage appInfo={appInfo} library={library} onLibraryUpdated={setLibrary} />;
 }

@@ -10,6 +10,15 @@ export function registerAppIpc(database: Database): void {
   }));
 
   ipcMain.handle("library:get-games", () => database.getGames());
+  ipcMain.handle("library:get-state", () => ({ games: database.getGames(), collections: database.getCollections() }));
+  ipcMain.handle("library:set-favorite", (_event, gameId: unknown, isFavorite: unknown) => {
+    if (typeof gameId !== "number" || typeof isFavorite !== "boolean") throw new Error("Invalid request.");
+    database.setGameFavorite(gameId, isFavorite);
+  });
+  ipcMain.handle("library:create-collection", (_event, name: unknown) => {
+    if (typeof name !== "string") throw new Error("Invalid request.");
+    return database.createCollection(name);
+  });
 
   ipcMain.handle("library:choose-and-import", async () => {
     const selection = await dialog.showOpenDialog({
