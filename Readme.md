@@ -19,6 +19,13 @@ GameVault is a modern, high-performance desktop game launcher built with **Elect
 * Recently played games
 * Playtime tracking
 
+### 🎨 Rich Customization
+
+* Interface Theme Modes (Dark, Light, System)
+* **Custom Theme Creator**: Visual hex color pickers to customize primary backgrounds, card backgrounds, text, and accent highlights in real-time
+* Multiple accent color presets (Lime, Violet, Rose, Sky, Amber, Emerald)
+* Configurable default scan Library Folder
+
 ### 🖼️ Metadata & Artwork
 
 * Game covers

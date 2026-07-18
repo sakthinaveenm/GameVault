@@ -70,8 +70,26 @@ export function App() {
     setProfile(updated);
   };
 
-  const handleUpdateSettings = async (theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null) => {
-    await window.gameVault.updateSettings(theme, accentColor, startInFullscreen, libraryDirectory);
+  const handleUpdateSettings = async (
+    theme: string,
+    accentColor: string,
+    startInFullscreen: boolean,
+    libraryDirectory: string | null,
+    customBgPrimary?: string,
+    customBgSecondary?: string,
+    customTextPrimary?: string,
+    customAccent?: string
+  ) => {
+    await window.gameVault.updateSettings(
+      theme,
+      accentColor,
+      startInFullscreen,
+      libraryDirectory,
+      customBgPrimary,
+      customBgSecondary,
+      customTextPrimary,
+      customAccent
+    );
     const updated = await window.gameVault.getProfile();
     setProfile(updated);
   };
@@ -85,8 +103,25 @@ export function App() {
     ? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
     : (profile?.theme || "dark");
 
+  // Compute dynamic custom styles if 'custom' is selected
+  const customThemeStyles = profile?.theme === "custom" ? {
+    "--bg-primary": profile.customBgPrimary || "#09090b",
+    "--bg-secondary": profile.customBgSecondary || "rgba(255, 255, 255, 0.02)",
+    "--bg-sidebar": profile.customBgSecondary ? `${profile.customBgSecondary}a0` : "rgba(24, 24, 27, 0.4)",
+    "--text-primary": profile.customTextPrimary || "#f4f4f5",
+    "--text-secondary": profile.customTextPrimary ? `${profile.customTextPrimary}a0` : "#a1a1aa",
+    "--border-color": profile.customTextPrimary ? `${profile.customTextPrimary}20` : "rgba(255, 255, 255, 0.08)",
+    "--accent": profile.customAccent || "#a3e635",
+    "--accent-hover": profile.customAccent || "#bef264",
+    "--accent-glow": profile.customAccent ? `${profile.customAccent}20` : "rgba(163, 230, 53, 0.15)",
+    "--accent-glow-strong": profile.customAccent ? `${profile.customAccent}60` : "rgba(163, 230, 53, 0.4)"
+  } as React.CSSProperties : {};
+
   return (
-    <div className={`theme-${resolvedTheme} accent-${profile?.accentColor || "lime"} min-h-screen bg-zinc-950`}>
+    <div
+      className={`theme-${resolvedTheme} accent-${profile?.accentColor || "lime"} min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]`}
+      style={customThemeStyles}
+    >
       <LibraryPage
         appInfo={appInfo}
         isBigPicture={isBigPicture}

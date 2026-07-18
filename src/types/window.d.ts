@@ -17,7 +17,16 @@ declare global {
       // Profile & Settings
       getProfile: () => Promise<Profile>;
       updateProfile: (name: string, avatarPath: string | null) => Promise<void>;
-      updateSettings: (theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null) => Promise<void>;
+      updateSettings: (
+        theme: string,
+        accentColor: string,
+        startInFullscreen: boolean,
+        libraryDirectory: string | null,
+        customBgPrimary?: string,
+        customBgSecondary?: string,
+        customTextPrimary?: string,
+        customAccent?: string
+      ) => Promise<void>;
       toggleSandboxMode: (enabled: boolean) => Promise<void>;
 
       // Game Launcher & Metadata
@@ -59,6 +68,10 @@ export type Profile = {
   accentColor: string;
   startInFullscreen: boolean;
   libraryDirectory?: string | null;
+  customBgPrimary?: string;
+  customBgSecondary?: string;
+  customTextPrimary?: string;
+  customAccent?: string;
 };
 
 export type Collection = { id: number; name: string; gameCount: number };

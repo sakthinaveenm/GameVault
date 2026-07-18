@@ -46,11 +46,39 @@ export function registerAppIpc(database: Database): void {
     database.updateProfile(name, avatarPath);
   });
 
-  ipcMain.handle("profile:update-settings", (_event, theme: unknown, accentColor: unknown, startInFullscreen: unknown, libraryDirectory: unknown) => {
-    if (typeof theme !== "string" || typeof accentColor !== "string" || typeof startInFullscreen !== "boolean" || (libraryDirectory !== null && typeof libraryDirectory !== "string")) {
+  ipcMain.handle("profile:update-settings", (
+    _event,
+    theme: unknown,
+    accentColor: unknown,
+    startInFullscreen: unknown,
+    libraryDirectory: unknown,
+    customBgPrimary: unknown,
+    customBgSecondary: unknown,
+    customTextPrimary: unknown,
+    customAccent: unknown
+  ) => {
+    if (
+      typeof theme !== "string" ||
+      typeof accentColor !== "string" ||
+      typeof startInFullscreen !== "boolean" ||
+      (libraryDirectory !== null && typeof libraryDirectory !== "string") ||
+      (customBgPrimary !== undefined && typeof customBgPrimary !== "string") ||
+      (customBgSecondary !== undefined && typeof customBgSecondary !== "string") ||
+      (customTextPrimary !== undefined && typeof customTextPrimary !== "string") ||
+      (customAccent !== undefined && typeof customAccent !== "string")
+    ) {
       throw new Error("Invalid request.");
     }
-    database.updateSettings(theme, accentColor, startInFullscreen, libraryDirectory);
+    database.updateSettings(
+      theme,
+      accentColor,
+      startInFullscreen,
+      libraryDirectory,
+      customBgPrimary,
+      customBgSecondary,
+      customTextPrimary,
+      customAccent
+    );
   });
 
   // Launch Game Handler

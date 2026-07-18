@@ -27,6 +27,10 @@ export type Profile = {
   accentColor: string;
   startInFullscreen: boolean;
   libraryDirectory?: string | null;
+  customBgPrimary?: string;
+  customBgSecondary?: string;
+  customTextPrimary?: string;
+  customAccent?: string;
 };
 
 export type GameImport = Pick<Game, "title" | "executablePath">;
@@ -113,6 +117,16 @@ const migrations = [
     name: "add_library_directory",
     up: `
       ALTER TABLE profiles ADD COLUMN library_directory TEXT;
+    `,
+  },
+  {
+    version: 7,
+    name: "add_custom_theme_colors",
+    up: `
+      ALTER TABLE profiles ADD COLUMN custom_bg_primary TEXT NOT NULL DEFAULT '#09090b';
+      ALTER TABLE profiles ADD COLUMN custom_bg_secondary TEXT NOT NULL DEFAULT '#18181b';
+      ALTER TABLE profiles ADD COLUMN custom_text_primary TEXT NOT NULL DEFAULT '#f4f4f5';
+      ALTER TABLE profiles ADD COLUMN custom_accent TEXT NOT NULL DEFAULT '#a3e635';
     `,
   },
 ] as const;
@@ -286,6 +300,10 @@ export class Database {
       accent_color: string;
       start_in_fullscreen: number;
       library_directory: string | null;
+      custom_bg_primary: string;
+      custom_bg_secondary: string;
+      custom_text_primary: string;
+      custom_accent: string;
     };
     return {
       id: row.id,
@@ -295,6 +313,10 @@ export class Database {
       accentColor: row.accent_color,
       startInFullscreen: row.start_in_fullscreen === 1,
       libraryDirectory: row.library_directory,
+      customBgPrimary: row.custom_bg_primary,
+      customBgSecondary: row.custom_bg_secondary,
+      customTextPrimary: row.custom_text_primary,
+      customAccent: row.custom_accent,
     };
   }
 
@@ -304,9 +326,37 @@ export class Database {
     this.connection.prepare("UPDATE profiles SET display_name = ?, avatar_path = ? WHERE id = 1").run(trimmedName, avatarPath);
   }
 
-  updateSettings(theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null): void {
-    this.connection.prepare("UPDATE profiles SET theme = ?, accent_color = ?, start_in_fullscreen = ?, library_directory = ? WHERE id = 1")
-      .run(theme, accentColor, startInFullscreen ? 1 : 0, libraryDirectory);
+  updateSettings(
+    theme: string,
+    accentColor: string,
+    startInFullscreen: boolean,
+    libraryDirectory: string | null,
+    customBgPrimary?: string,
+    customBgSecondary?: string,
+    customTextPrimary?: string,
+    customAccent?: string
+  ): void {
+    this.connection.prepare(`
+      UPDATE profiles SET
+        theme = ?,
+        accent_color = ?,
+        start_in_fullscreen = ?,
+        library_directory = ?,
+        custom_bg_primary = COALESCE(?, custom_bg_primary),
+        custom_bg_secondary = COALESCE(?, custom_bg_secondary),
+        custom_text_primary = COALESCE(?, custom_text_primary),
+        custom_accent = COALESCE(?, custom_accent)
+      WHERE id = 1
+    `).run(
+      theme,
+      accentColor,
+      startInFullscreen ? 1 : 0,
+      libraryDirectory,
+      customBgPrimary || null,
+      customBgSecondary || null,
+      customTextPrimary || null,
+      customAccent || null
+    );
   }
 
   recordGameStart(gameId: number): void {

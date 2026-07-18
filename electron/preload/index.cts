@@ -11,7 +11,26 @@ contextBridge.exposeInMainWorld("gameVault", {
   // Profile & Settings
   getProfile: () => ipcRenderer.invoke("profile:get"),
   updateProfile: (name: string, avatarPath: string | null) => ipcRenderer.invoke("profile:update", name, avatarPath),
-  updateSettings: (theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null) => ipcRenderer.invoke("profile:update-settings", theme, accentColor, startInFullscreen, libraryDirectory),
+  updateSettings: (
+    theme: string,
+    accentColor: string,
+    startInFullscreen: boolean,
+    libraryDirectory: string | null,
+    customBgPrimary?: string,
+    customBgSecondary?: string,
+    customTextPrimary?: string,
+    customAccent?: string
+  ) => ipcRenderer.invoke(
+    "profile:update-settings",
+    theme,
+    accentColor,
+    startInFullscreen,
+    libraryDirectory,
+    customBgPrimary,
+    customBgSecondary,
+    customTextPrimary,
+    customAccent
+  ),
   toggleSandboxMode: (enabled: boolean) => ipcRenderer.invoke("profile:toggle-sandbox", enabled),
 
   // Game Launcher & Metadata
