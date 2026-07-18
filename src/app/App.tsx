@@ -7,6 +7,7 @@ type AppInfo = Awaited<ReturnType<typeof window.gameVault.getAppInfo>>;
 
 export function App() {
   const [booting, setBooting] = useState(true);
+  const [bpBooting, setBpBooting] = useState(false);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [library, setLibrary] = useState<LibraryState>({ games: [], collections: [] });
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -52,6 +53,12 @@ export function App() {
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
 
+  useEffect(() => {
+    if (isBigPicture && !booting) {
+      setBpBooting(true);
+    }
+  }, [isBigPicture, booting]);
+
   const setBigPicture = useCallback(async (enabled: boolean) => {
     try {
       if (enabled && !document.fullscreenElement) {
@@ -75,16 +82,19 @@ export function App() {
     accentColor: string,
     startInFullscreen: boolean,
     libraryDirectory: string | null,
+    steamDirectory?: string | null,
     customBgPrimary?: string,
     customBgSecondary?: string,
     customTextPrimary?: string,
     customAccent?: string
   ) => {
+    const resolvedSteamDir = steamDirectory !== undefined ? steamDirectory : (profile?.steamDirectory || null);
     await window.gameVault.updateSettings(
       theme,
       accentColor,
       startInFullscreen,
       libraryDirectory,
+      resolvedSteamDir,
       customBgPrimary,
       customBgSecondary,
       customTextPrimary,
@@ -122,17 +132,21 @@ export function App() {
       className={`theme-${resolvedTheme} accent-${profile?.accentColor || "lime"} min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]`}
       style={customThemeStyles}
     >
-      <LibraryPage
-        appInfo={appInfo}
-        isBigPicture={isBigPicture}
-        library={library}
-        profile={profile}
-        activeGameId={activeGameId}
-        onBigPictureChange={setBigPicture}
-        onLibraryUpdated={setLibrary}
-        onUpdateProfile={handleUpdateProfile}
-        onUpdateSettings={handleUpdateSettings}
-      />
+      {bpBooting ? (
+        <BootScreen onComplete={() => setBpBooting(false)} />
+      ) : (
+        <LibraryPage
+          appInfo={appInfo}
+          isBigPicture={isBigPicture}
+          library={library}
+          profile={profile}
+          activeGameId={activeGameId}
+          onBigPictureChange={setBigPicture}
+          onLibraryUpdated={setLibrary}
+          onUpdateProfile={handleUpdateProfile}
+          onUpdateSettings={handleUpdateSettings}
+        />
+      )}
     </div>
   );
 }

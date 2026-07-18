@@ -52,6 +52,7 @@ export function registerAppIpc(database: Database): void {
     accentColor: unknown,
     startInFullscreen: unknown,
     libraryDirectory: unknown,
+    steamDirectory: unknown,
     customBgPrimary: unknown,
     customBgSecondary: unknown,
     customTextPrimary: unknown,
@@ -62,6 +63,7 @@ export function registerAppIpc(database: Database): void {
       typeof accentColor !== "string" ||
       typeof startInFullscreen !== "boolean" ||
       (libraryDirectory !== null && typeof libraryDirectory !== "string") ||
+      (steamDirectory !== null && typeof steamDirectory !== "string") ||
       (customBgPrimary !== undefined && typeof customBgPrimary !== "string") ||
       (customBgSecondary !== undefined && typeof customBgSecondary !== "string") ||
       (customTextPrimary !== undefined && typeof customTextPrimary !== "string") ||
@@ -74,6 +76,7 @@ export function registerAppIpc(database: Database): void {
       accentColor,
       startInFullscreen,
       libraryDirectory,
+      steamDirectory,
       customBgPrimary,
       customBgSecondary,
       customTextPrimary,
@@ -114,7 +117,8 @@ export function registerAppIpc(database: Database): void {
 
   // Sync Platforms Handlers
   ipcMain.handle("library:sync-platforms", async () => {
-    const steamGames = await scanSteamGames();
+    const profile = database.getProfile();
+    const steamGames = await scanSteamGames(profile.steamDirectory);
     const epicGames = await scanEpicGames();
     const gogGames = await scanGogGames();
 

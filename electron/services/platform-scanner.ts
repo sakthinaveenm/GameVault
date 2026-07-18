@@ -74,10 +74,17 @@ function parseAcf(content: string): { name?: string; appid?: string; installdir?
   return result;
 }
 
-export async function scanSteamGames(): Promise<ScannedPlatformGame[]> {
+export async function scanSteamGames(customSteamDir?: string | null): Promise<ScannedPlatformGame[]> {
   const games: ScannedPlatformGame[] = [];
-  const steamDir = await getSteamManifestDir();
+  let steamDir = customSteamDir || await getSteamManifestDir();
   if (!steamDir) return games;
+
+  if (customSteamDir) {
+    const lower = steamDir.toLowerCase();
+    if (!lower.endsWith("steamapps") && !lower.endsWith("steamapps/") && !lower.endsWith("steamapps\\")) {
+      steamDir = path.join(steamDir, "steamapps");
+    }
+  }
 
   try {
     const entries = await readdir(steamDir);

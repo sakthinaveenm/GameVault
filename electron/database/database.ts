@@ -27,6 +27,7 @@ export type Profile = {
   accentColor: string;
   startInFullscreen: boolean;
   libraryDirectory?: string | null;
+  steamDirectory?: string | null;
   customBgPrimary?: string;
   customBgSecondary?: string;
   customTextPrimary?: string;
@@ -127,6 +128,13 @@ const migrations = [
       ALTER TABLE profiles ADD COLUMN custom_bg_secondary TEXT NOT NULL DEFAULT '#18181b';
       ALTER TABLE profiles ADD COLUMN custom_text_primary TEXT NOT NULL DEFAULT '#f4f4f5';
       ALTER TABLE profiles ADD COLUMN custom_accent TEXT NOT NULL DEFAULT '#a3e635';
+    `,
+  },
+  {
+    version: 8,
+    name: "add_steam_directory",
+    up: `
+      ALTER TABLE profiles ADD COLUMN steam_directory TEXT;
     `,
   },
 ] as const;
@@ -300,6 +308,7 @@ export class Database {
       accent_color: string;
       start_in_fullscreen: number;
       library_directory: string | null;
+      steam_directory: string | null;
       custom_bg_primary: string;
       custom_bg_secondary: string;
       custom_text_primary: string;
@@ -313,6 +322,7 @@ export class Database {
       accentColor: row.accent_color,
       startInFullscreen: row.start_in_fullscreen === 1,
       libraryDirectory: row.library_directory,
+      steamDirectory: row.steam_directory,
       customBgPrimary: row.custom_bg_primary,
       customBgSecondary: row.custom_bg_secondary,
       customTextPrimary: row.custom_text_primary,
@@ -331,6 +341,7 @@ export class Database {
     accentColor: string,
     startInFullscreen: boolean,
     libraryDirectory: string | null,
+    steamDirectory: string | null,
     customBgPrimary?: string,
     customBgSecondary?: string,
     customTextPrimary?: string,
@@ -342,6 +353,7 @@ export class Database {
         accent_color = ?,
         start_in_fullscreen = ?,
         library_directory = ?,
+        steam_directory = ?,
         custom_bg_primary = COALESCE(?, custom_bg_primary),
         custom_bg_secondary = COALESCE(?, custom_bg_secondary),
         custom_text_primary = COALESCE(?, custom_text_primary),
@@ -352,6 +364,7 @@ export class Database {
       accentColor,
       startInFullscreen ? 1 : 0,
       libraryDirectory,
+      steamDirectory,
       customBgPrimary || null,
       customBgSecondary || null,
       customTextPrimary || null,

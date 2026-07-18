@@ -5,6 +5,7 @@ import type { Game, LibraryState, Profile } from "../types/window";
 import { GameDetailsPage } from "./GameDetailsPage";
 import { CustomizationSettings } from "../components/CustomizationSettings";
 import { ProfileModal } from "../components/ProfileModal";
+import { BigPictureView } from "../components/BigPictureView";
 import {
   Grid,
   List,
@@ -33,7 +34,16 @@ interface LibraryPageProps {
   onBigPictureChange: (enabled: boolean) => Promise<void>;
   onLibraryUpdated: (library: LibraryState) => void;
   onUpdateProfile: (name: string, avatarPath: string | null) => Promise<void>;
-  onUpdateSettings: (theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null) => Promise<void>;
+  onUpdateSettings: (
+    theme: string,
+    accentColor: string,
+    startInFullscreen: boolean,
+    libraryDirectory: string | null,
+    customBgPrimary?: string,
+    customBgSecondary?: string,
+    customTextPrimary?: string,
+    customAccent?: string
+  ) => Promise<void>;
 }
 
 const navigation = ["Home", "Library", "Collections", "Settings"];
@@ -247,6 +257,20 @@ export function LibraryPage({
 
   // Preset avatar selection
   const avatarValue = profile?.avatarPath || "👾";
+
+  if (isBigPicture) {
+    return (
+      <BigPictureView
+        library={library}
+        profile={profile}
+        activeGameId={activeGameId}
+        onBigPictureChange={onBigPictureChange}
+        onLibraryUpdated={onLibraryUpdated}
+        onUpdateProfile={onUpdateProfile}
+        onUpdateSettings={onUpdateSettings}
+      />
+    );
+  }
 
   return (
     <main className={`min-h-screen bg-zinc-950 text-zinc-100 ${isBigPicture ? "bg-[radial-gradient(circle_at_top,#1c2317,#09090b_60%)]" : ""}`}>
@@ -805,6 +829,75 @@ export function LibraryPage({
                             type="button"
                           >
                             Clear
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Steam Directory widget */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <Settings className="size-5 text-[var(--accent)]" /> Steam Directory
+                    </h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Configure a custom Steam installation folder (containing 'steamapps') if not detected automatically.
+                    </p>
+
+                    <div className="rounded-2xl bg-zinc-950 p-4 border border-white/5 space-y-3">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={profile.steamDirectory || "Default Steam Directory"}
+                          className="flex-1 rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs outline-none truncate text-zinc-500 font-mono"
+                        />
+                        <button
+                          onClick={async () => {
+                            try {
+                              const selected = await window.gameVault.selectDirectory();
+                              if (selected) {
+                                await onUpdateSettings(
+                                  profile.theme,
+                                  profile.accentColor,
+                                  profile.startInFullscreen,
+                                  profile.libraryDirectory || null,
+                                  selected
+                                );
+                                sounds.playConfirm();
+                              }
+                            } catch (err: any) {
+                              setMessage("Failed to select Steam folder: " + (err.message || err));
+                            }
+                          }}
+                          className="rounded-xl bg-white/10 px-4 py-2 text-xs font-bold hover:bg-white/15 transition text-white"
+                          type="button"
+                        >
+                          Browse
+                        </button>
+                      </div>
+
+                      {profile.steamDirectory && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              try {
+                                await onUpdateSettings(
+                                  profile.theme,
+                                  profile.accentColor,
+                                  profile.startInFullscreen,
+                                  profile.libraryDirectory || null,
+                                  null
+                                );
+                                sounds.playConfirm();
+                              } catch (err: any) {
+                                setMessage("Failed to clear Steam folder: " + (err.message || err));
+                              }
+                            }}
+                            className="w-full rounded-xl bg-red-950/40 border border-red-500/20 py-2 text-xs font-bold hover:bg-red-950 transition text-red-200"
+                            type="button"
+                          >
+                            Clear Custom Steam Path
                           </button>
                         </div>
                       )}

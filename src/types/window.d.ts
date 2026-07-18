@@ -22,6 +22,7 @@ declare global {
         accentColor: string,
         startInFullscreen: boolean,
         libraryDirectory: string | null,
+        steamDirectory: string | null,
         customBgPrimary?: string,
         customBgSecondary?: string,
         customTextPrimary?: string,
@@ -68,6 +69,7 @@ export type Profile = {
   accentColor: string;
   startInFullscreen: boolean;
   libraryDirectory?: string | null;
+  steamDirectory?: string | null;
   customBgPrimary?: string;
   customBgSecondary?: string;
   customTextPrimary?: string;
