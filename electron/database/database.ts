@@ -1,4 +1,17 @@
 import DatabaseDriver from "better-sqlite3";
+import { isAbsolute } from "node:path";
+
+export type Game = {
+  id: number;
+  title: string;
+  executablePath: string;
+  installedAt: string;
+  lastPlayedAt: string | null;
+  playtimeSeconds: number;
+  isFavorite: boolean;
+};
+
+export type GameImport = Pick<Game, "title" | "executablePath">;
 
 const migrations = [
   {
@@ -37,6 +50,55 @@ export class Database {
 
   isReady(): boolean {
     return this.connection.open;
+  }
+
+  importGames(games: GameImport[]): number {
+    const uniqueGames = [...new Map(games.map((game) => [game.executablePath, game])).values()];
+    if (uniqueGames.length === 0) return 0;
+
+    for (const game of uniqueGames) {
+      if (!game.title.trim() || !isAbsolute(game.executablePath)) {
+        throw new Error("Invalid game import.");
+      }
+    }
+
+    const upsertGame = this.connection.prepare(`
+      INSERT INTO games (title, executable_path)
+      VALUES (?, ?)
+      ON CONFLICT(executable_path) DO UPDATE SET title = excluded.title
+    `);
+    const importAll = this.connection.transaction((entries: GameImport[]) => {
+      for (const game of entries) upsertGame.run(game.title.trim(), game.executablePath);
+    });
+
+    importAll(uniqueGames);
+    return uniqueGames.length;
+  }
+
+  getGames(): Game[] {
+    const rows = this.connection.prepare(`
+      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite
+      FROM games
+      ORDER BY title COLLATE NOCASE ASC
+    `).all() as Array<{
+      id: number;
+      title: string;
+      executable_path: string;
+      installed_at: string;
+      last_played_at: string | null;
+      playtime_seconds: number;
+      is_favorite: number;
+    }>;
+
+    return rows.map((game) => ({
+      id: game.id,
+      title: game.title,
+      executablePath: game.executable_path,
+      installedAt: game.installed_at,
+      lastPlayedAt: game.last_played_at,
+      playtimeSeconds: game.playtime_seconds,
+      isFavorite: game.is_favorite === 1,
+    }));
   }
 
   private runMigrations(): void {

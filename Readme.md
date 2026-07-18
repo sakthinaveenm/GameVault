@@ -141,9 +141,9 @@ GameVault/
 
 ## Version 0.2
 
-* [ ] Scan game folders
-* [ ] Import executable games
-* [ ] Store game data
+* [x] Scan game folders
+* [x] Import executable games
+* [x] Store game data
 * [ ] Launch games
 
 ## Version 0.3
