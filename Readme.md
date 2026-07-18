@@ -151,12 +151,12 @@ GameVault/
 * [x] Scan game folders
 * [x] Import executable games
 * [x] Store game data
-* [ ] Launch games
+* [x] Launch games
 
 ## Version 0.3
 
-* [ ] Metadata
-* [ ] Artwork
+* [x] Metadata
+* [x] Artwork
 * [x] Search
 * [x] Filters
 * [x] Collections
