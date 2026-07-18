@@ -17,13 +17,15 @@ declare global {
       // Profile & Settings
       getProfile: () => Promise<Profile>;
       updateProfile: (name: string, avatarPath: string | null) => Promise<void>;
-      updateSettings: (theme: string, accentColor: string, startInFullscreen: boolean) => Promise<void>;
+      updateSettings: (theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null) => Promise<void>;
       toggleSandboxMode: (enabled: boolean) => Promise<void>;
 
       // Game Launcher & Metadata
       launchGame: (gameId: number) => Promise<void>;
       updateGameMetadata: (gameId: number, metadata: Partial<Game>) => Promise<void>;
       syncPlatforms: () => Promise<{ imported: number }>;
+      selectDirectory: () => Promise<string | null>;
+      scanConfiguredDirectory: (directory: string) => Promise<{ count: number }>;
 
       // Events
       onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => () => void;
@@ -56,6 +58,7 @@ export type Profile = {
   theme: string;
   accentColor: string;
   startInFullscreen: boolean;
+  libraryDirectory?: string | null;
 };
 
 export type Collection = { id: number; name: string; gameCount: number };

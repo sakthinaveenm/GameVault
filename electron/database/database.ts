@@ -26,6 +26,7 @@ export type Profile = {
   theme: string;
   accentColor: string;
   startInFullscreen: boolean;
+  libraryDirectory?: string | null;
 };
 
 export type GameImport = Pick<Game, "title" | "executablePath">;
@@ -105,6 +106,13 @@ const migrations = [
     up: `
       ALTER TABLE games ADD COLUMN platform TEXT NOT NULL DEFAULT 'local';
       ALTER TABLE games ADD COLUMN platform_game_id TEXT;
+    `,
+  },
+  {
+    version: 6,
+    name: "add_library_directory",
+    up: `
+      ALTER TABLE profiles ADD COLUMN library_directory TEXT;
     `,
   },
 ] as const;
@@ -277,6 +285,7 @@ export class Database {
       theme: string;
       accent_color: string;
       start_in_fullscreen: number;
+      library_directory: string | null;
     };
     return {
       id: row.id,
@@ -285,6 +294,7 @@ export class Database {
       theme: row.theme,
       accentColor: row.accent_color,
       startInFullscreen: row.start_in_fullscreen === 1,
+      libraryDirectory: row.library_directory,
     };
   }
 
@@ -294,9 +304,9 @@ export class Database {
     this.connection.prepare("UPDATE profiles SET display_name = ?, avatar_path = ? WHERE id = 1").run(trimmedName, avatarPath);
   }
 
-  updateSettings(theme: string, accentColor: string, startInFullscreen: boolean): void {
-    this.connection.prepare("UPDATE profiles SET theme = ?, accent_color = ?, start_in_fullscreen = ? WHERE id = 1")
-      .run(theme, accentColor, startInFullscreen ? 1 : 0);
+  updateSettings(theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null): void {
+    this.connection.prepare("UPDATE profiles SET theme = ?, accent_color = ?, start_in_fullscreen = ?, library_directory = ? WHERE id = 1")
+      .run(theme, accentColor, startInFullscreen ? 1 : 0, libraryDirectory);
   }
 
   recordGameStart(gameId: number): void {

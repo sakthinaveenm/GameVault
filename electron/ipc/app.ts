@@ -46,17 +46,34 @@ export function registerAppIpc(database: Database): void {
     database.updateProfile(name, avatarPath);
   });
 
-  ipcMain.handle("profile:update-settings", (_event, theme: unknown, accentColor: unknown, startInFullscreen: unknown) => {
-    if (typeof theme !== "string" || typeof accentColor !== "string" || typeof startInFullscreen !== "boolean") {
+  ipcMain.handle("profile:update-settings", (_event, theme: unknown, accentColor: unknown, startInFullscreen: unknown, libraryDirectory: unknown) => {
+    if (typeof theme !== "string" || typeof accentColor !== "string" || typeof startInFullscreen !== "boolean" || (libraryDirectory !== null && typeof libraryDirectory !== "string")) {
       throw new Error("Invalid request.");
     }
-    database.updateSettings(theme, accentColor, startInFullscreen);
+    database.updateSettings(theme, accentColor, startInFullscreen, libraryDirectory);
   });
 
   // Launch Game Handler
   ipcMain.handle("library:launch-game", (_event, gameId: unknown) => {
     if (typeof gameId !== "number") throw new Error("Invalid request.");
     launchGame(database, gameId);
+  });
+
+  // Directory Selection Dialog and Scanner
+  ipcMain.handle("library:select-directory", async () => {
+    const selection = await dialog.showOpenDialog({
+      title: "Select Game Library Folder",
+      buttonLabel: "Select Folder",
+      properties: ["openDirectory"],
+    });
+    if (selection.canceled || selection.filePaths.length === 0) return null;
+    return selection.filePaths[0];
+  });
+
+  ipcMain.handle("library:scan-configured", async (_event, directory: unknown) => {
+    if (typeof directory !== "string") throw new Error("Invalid request.");
+    const games = await scanForGames(directory);
+    return { count: database.importGames(games) };
   });
 
   // Metadata Updates

@@ -33,7 +33,7 @@ interface LibraryPageProps {
   onBigPictureChange: (enabled: boolean) => Promise<void>;
   onLibraryUpdated: (library: LibraryState) => void;
   onUpdateProfile: (name: string, avatarPath: string | null) => Promise<void>;
-  onUpdateSettings: (theme: string, accentColor: string, startInFullscreen: boolean) => Promise<void>;
+  onUpdateSettings: (theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null) => Promise<void>;
 }
 
 const navigation = ["Home", "Library", "Collections", "Settings"];
@@ -171,6 +171,46 @@ export function LibraryPage({
   async function handleUpdateMetadata(gameId: number, data: Partial<Game>) {
     await window.gameVault.updateGameMetadata(gameId, data);
     await refreshLibrary();
+  }
+
+  async function handleSelectLibraryDirectory() {
+    try {
+      const selected = await window.gameVault.selectDirectory();
+      if (selected) {
+        await onUpdateSettings(profile!.theme, profile!.accentColor, profile!.startInFullscreen, selected);
+        setMessage(`Default library directory set to: ${selected}`);
+        sounds.playConfirm();
+      }
+    } catch (err: any) {
+      setMessage("Failed to select folder: " + (err.message || err));
+    }
+  }
+
+  async function handleClearLibraryDirectory() {
+    try {
+      await onUpdateSettings(profile!.theme, profile!.accentColor, profile!.startInFullscreen, null);
+      setMessage("Default library directory cleared.");
+      sounds.playConfirm();
+    } catch (err: any) {
+      setMessage("Failed to clear folder: " + (err.message || err));
+    }
+  }
+
+  async function handleScanConfiguredDirectory() {
+    if (!profile?.libraryDirectory) return;
+    setMessage(`Scanning library folder: ${profile.libraryDirectory}...`);
+    try {
+      const res = await window.gameVault.scanConfiguredDirectory(profile.libraryDirectory);
+      await refreshLibrary();
+      setMessage(
+        res.count > 0
+          ? `Scanning completed. Discovered and imported ${res.count} new local games.`
+          : "Scanning completed. No new local games found."
+      );
+      sounds.playConfirm();
+    } catch (err: any) {
+      setMessage("Failed to scan directory: " + (err.message || err));
+    }
   }
 
   async function handleSyncPlatforms() {
@@ -694,33 +734,82 @@ export function LibraryPage({
                   </div>
                 </div>
 
-                {/* Profile settings widget */}
-                <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-6">
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    <User className="size-5 text-[var(--accent)]" /> Player Profile
-                  </h3>
+                <div className="space-y-6">
+                  {/* Profile settings widget */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-6">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <User className="size-5 text-[var(--accent)]" /> Player Profile
+                    </h3>
 
-                  <div className="flex items-center gap-4">
-                    <div className="grid size-16 place-items-center rounded-full bg-[var(--accent-glow)] border-2 border-[var(--accent)] text-3xl select-none">
-                      {avatarValue.startsWith("http") || avatarValue.includes("/") ? (
-                        <img src={avatarValue} alt="Avatar" className="size-full rounded-full object-cover" />
-                      ) : (
-                        avatarValue
-                      )}
+                    <div className="flex items-center gap-4">
+                      <div className="grid size-16 place-items-center rounded-full bg-[var(--accent-glow)] border-2 border-[var(--accent)] text-3xl select-none">
+                        {avatarValue.startsWith("http") || avatarValue.includes("/") ? (
+                          <img src={avatarValue} alt="Avatar" className="size-full rounded-full object-cover" />
+                        ) : (
+                          avatarValue
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-lg text-white">{profile.displayName}</h4>
+                        <p className="text-xs text-zinc-500">Logged in player</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-lg text-white">{profile.displayName}</h4>
-                      <p className="text-xs text-zinc-500">Logged in player</p>
-                    </div>
+
+                    <button
+                      onClick={() => setIsProfileOpen(true)}
+                      className="w-full text-center rounded-xl bg-white/10 py-3 text-sm font-semibold hover:bg-white/15 transition"
+                      type="button"
+                    >
+                      Edit Profile Details
+                    </button>
                   </div>
 
-                  <button
-                    onClick={() => setIsProfileOpen(true)}
-                    className="w-full text-center rounded-xl bg-white/10 py-3 text-sm font-semibold hover:bg-white/15 transition"
-                    type="button"
-                  >
-                    Edit Profile Details
-                  </button>
+                  {/* Library Folders widget */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <FolderPlus className="size-5 text-[var(--accent)]" /> Library Directory
+                    </h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Configure a default library folder to scan for local executables and game files.
+                    </p>
+
+                    <div className="rounded-2xl bg-zinc-950 p-4 border border-white/5 space-y-3">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={profile.libraryDirectory || "No directory configured"}
+                          className="flex-1 rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs outline-none truncate text-zinc-500 font-mono"
+                        />
+                        <button
+                          onClick={handleSelectLibraryDirectory}
+                          className="rounded-xl bg-white/10 px-4 py-2 text-xs font-bold hover:bg-white/15 transition text-white"
+                          type="button"
+                        >
+                          Browse
+                        </button>
+                      </div>
+
+                      {profile.libraryDirectory && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleScanConfiguredDirectory}
+                            className="flex-1 rounded-xl bg-[var(--accent)] py-2 text-xs font-black text-zinc-950 hover:bg-[var(--accent-hover)] transition"
+                            type="button"
+                          >
+                            Scan Folder
+                          </button>
+                          <button
+                            onClick={handleClearLibraryDirectory}
+                            className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2 text-xs font-bold hover:bg-red-950 transition text-red-200"
+                            type="button"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

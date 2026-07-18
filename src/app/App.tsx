@@ -70,8 +70,8 @@ export function App() {
     setProfile(updated);
   };
 
-  const handleUpdateSettings = async (theme: string, accentColor: string, startInFullscreen: boolean) => {
-    await window.gameVault.updateSettings(theme, accentColor, startInFullscreen);
+  const handleUpdateSettings = async (theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null) => {
+    await window.gameVault.updateSettings(theme, accentColor, startInFullscreen, libraryDirectory);
     const updated = await window.gameVault.getProfile();
     setProfile(updated);
   };

@@ -3,7 +3,7 @@ import { Monitor, Sun, Moon, Palette, Maximize } from "lucide-react";
 
 interface CustomizationSettingsProps {
   profile: Profile;
-  onUpdateSettings: (theme: string, accentColor: string, startInFullscreen: boolean) => Promise<void>;
+  onUpdateSettings: (theme: string, accentColor: string, startInFullscreen: boolean, libraryDirectory: string | null) => Promise<void>;
   onClose?: () => void;
 }
 
@@ -26,15 +26,15 @@ export function CustomizationSettings({
   const startInFullscreen = profile.startInFullscreen;
 
   const handleThemeChange = (newTheme: string) => {
-    void onUpdateSettings(newTheme, currentAccent, startInFullscreen);
+    void onUpdateSettings(newTheme, currentAccent, startInFullscreen, profile.libraryDirectory || null);
   };
 
   const handleAccentChange = (newAccent: string) => {
-    void onUpdateSettings(currentTheme, newAccent, startInFullscreen);
+    void onUpdateSettings(currentTheme, newAccent, startInFullscreen, profile.libraryDirectory || null);
   };
 
   const handleFullscreenToggle = (enabled: boolean) => {
-    void onUpdateSettings(currentTheme, currentAccent, enabled);
+    void onUpdateSettings(currentTheme, currentAccent, enabled, profile.libraryDirectory || null);
   };
 
   return (
