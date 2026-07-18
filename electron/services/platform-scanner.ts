@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, access } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 
@@ -15,9 +15,48 @@ export type ScannedPlatformGame = {
   releaseDate?: string;
 };
 
-// Standard macOS paths for Steam, Epic, and GOG clients
-const STEAM_MANIFEST_DIR = path.join(os.homedir(), "Library/Application Support/Steam/steamapps");
-const EPIC_MANIFEST_DIR = path.join(os.homedir(), "Library/Application Support/Epic/EpicGamesLauncher/Data/Manifests");
+// Find existing directory from list of potential candidates
+async function findExistingDir(paths: string[]): Promise<string | null> {
+  for (const p of paths) {
+    try {
+      await access(p);
+      return p;
+    } catch {
+      // Directory not found, try next candidate
+    }
+  }
+  return null;
+}
+
+async function getSteamManifestDir(): Promise<string | null> {
+  if (process.platform === "darwin") {
+    return path.join(os.homedir(), "Library/Application Support/Steam/steamapps");
+  } else if (process.platform === "win32") {
+    const winPaths = [
+      "C:\\Program Files (x86)\\Steam\\steamapps",
+      "C:\\Program Files\\Steam\\steamapps",
+    ];
+    return (await findExistingDir(winPaths)) || winPaths[0];
+  } else {
+    // Linux paths
+    const linuxPaths = [
+      path.join(os.homedir(), ".steam/steam/steamapps"),
+      path.join(os.homedir(), ".local/share/Steam/steamapps"),
+      path.join(os.homedir(), ".var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps"),
+    ];
+    return (await findExistingDir(linuxPaths)) || linuxPaths[0];
+  }
+}
+
+async function getEpicManifestDir(): Promise<string | null> {
+  if (process.platform === "darwin") {
+    return path.join(os.homedir(), "Library/Application Support/Epic/EpicGamesLauncher/Data/Manifests");
+  } else if (process.platform === "win32") {
+    const programData = process.env.ProgramData || "C:\\ProgramData";
+    return path.join(programData, "Epic/EpicGamesLauncher/Data/Manifests");
+  }
+  return null;
+}
 
 // Parser helper for Steam .acf files
 function parseAcf(content: string): { name?: string; appid?: string; installdir?: string } {
@@ -37,11 +76,14 @@ function parseAcf(content: string): { name?: string; appid?: string; installdir?
 
 export async function scanSteamGames(): Promise<ScannedPlatformGame[]> {
   const games: ScannedPlatformGame[] = [];
+  const steamDir = await getSteamManifestDir();
+  if (!steamDir) return games;
+
   try {
-    const entries = await readdir(STEAM_MANIFEST_DIR);
+    const entries = await readdir(steamDir);
     for (const entry of entries) {
       if (entry.startsWith("appmanifest_") && entry.endsWith(".acf")) {
-        const filePath = path.join(STEAM_MANIFEST_DIR, entry);
+        const filePath = path.join(steamDir, entry);
         const content = await readFile(filePath, "utf-8");
         const parsed = parseAcf(content);
         if (parsed.appid && parsed.name) {
@@ -59,7 +101,6 @@ export async function scanSteamGames(): Promise<ScannedPlatformGame[]> {
       }
     }
   } catch (err) {
-    // If folder doesn't exist, ignore
     console.log("Steam directory not detected, skipping scan.");
   }
   return games;
@@ -67,11 +108,14 @@ export async function scanSteamGames(): Promise<ScannedPlatformGame[]> {
 
 export async function scanEpicGames(): Promise<ScannedPlatformGame[]> {
   const games: ScannedPlatformGame[] = [];
+  const epicDir = await getEpicManifestDir();
+  if (!epicDir) return games;
+
   try {
-    const entries = await readdir(EPIC_MANIFEST_DIR);
+    const entries = await readdir(epicDir);
     for (const entry of entries) {
       if (entry.endsWith(".item")) {
-        const filePath = path.join(EPIC_MANIFEST_DIR, entry);
+        const filePath = path.join(epicDir, entry);
         const content = await readFile(filePath, "utf-8");
         const parsed = JSON.parse(content);
         if (parsed.AppName && parsed.DisplayName) {
@@ -88,7 +132,6 @@ export async function scanEpicGames(): Promise<ScannedPlatformGame[]> {
       }
     }
   } catch (err) {
-    // If folder doesn't exist, ignore
     console.log("Epic Manifest directory not detected, skipping scan.");
   }
   return games;

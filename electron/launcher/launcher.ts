@@ -94,8 +94,15 @@ export function launchGame(database: Database, gameId: number): void {
     const maxWaitPolls = 12; // 60 seconds timeout waiting for launch
 
     const pollingInterval = setInterval(() => {
-      exec(`pgrep -f "${binaryName}"`, (err, stdout) => {
-        const isRunning = !err && stdout.trim().length > 0;
+      const isWin = process.platform === "win32";
+      const cmd = isWin
+        ? `tasklist /NH /FI "IMAGENAME eq ${binaryName.endsWith(".exe") ? binaryName : binaryName + ".exe"}"`
+        : `pgrep -f "${binaryName}"`;
+
+      exec(cmd, (err, stdout) => {
+        const isRunning = isWin
+          ? (!err && stdout.toLowerCase().includes(binaryName.toLowerCase()))
+          : (!err && stdout.trim().length > 0);
 
         if (!hasStarted) {
           waitPolls++;
