@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "start": "electron .",
     "package": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "release": "npm run build && electron-builder --publish never"
   },
   "build": {
     "appId": "com.gamevault.launcher",
