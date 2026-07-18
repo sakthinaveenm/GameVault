@@ -161,6 +161,52 @@ GameVault/
 * [x] Focus management
 * [x] Sound effects
 
+## Version 0.5
+
+### User Experience
+
+* [x] Animated GameVault boot screen
+* [x] Startup splash animation
+* [x] Smooth application loading sequence
+* [x] Improved transitions and UI animations
+
+### User Profile
+
+* [x] User profile
+* [x] Profile avatar
+* [x] Display name
+* [x] Profile statistics
+
+### Game Experience
+
+* [x] Game details page
+* [x] Hero artwork
+* [x] Playtime tracking
+* [x] Last played date
+* [x] Recently played games
+* [x] Continue Playing section
+
+### Statistics
+
+* [x] Total playtime
+* [x] Most played games
+* [x] Library statistics
+* [x] Session timer
+
+### Customization
+
+* [x] Themes
+* [x] Accent colors
+* [x] Startup options
+* [x] Library layout customization
+
+### Performance
+
+* [x] Faster startup
+* [x] Artwork caching improvements
+* [x] Database optimization
+* [x] Background task optimization
+
 ## Version 1.0
 
 * [ ] Steam integration

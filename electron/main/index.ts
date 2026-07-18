@@ -7,7 +7,7 @@ import { Database } from "../database/database.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
 
-function createWindow(): BrowserWindow {
+function createWindow(startInFullscreen: boolean): BrowserWindow {
   const window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -15,6 +15,7 @@ function createWindow(): BrowserWindow {
     minHeight: 680,
     backgroundColor: "#09090b",
     titleBarStyle: "hiddenInset",
+    fullscreen: startInFullscreen,
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
@@ -41,10 +42,15 @@ app.whenReady().then(() => {
   app.setAppUserModelId("com.gamevault.launcher");
   const database = Database.open(path.join(app.getPath("userData"), "gamevault.db"));
   registerAppIpc(database);
-  createWindow();
+
+  const profile = database.getProfile();
+  createWindow(profile.startInFullscreen);
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      const currentProfile = database.getProfile();
+      createWindow(currentProfile.startInFullscreen);
+    }
   });
 });
 

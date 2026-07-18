@@ -9,6 +9,21 @@ export type Game = {
   lastPlayedAt: string | null;
   playtimeSeconds: number;
   isFavorite: boolean;
+  description?: string | null;
+  coverPath?: string | null;
+  developer?: string | null;
+  publisher?: string | null;
+  genres?: string | null;
+  releaseDate?: string | null;
+};
+
+export type Profile = {
+  id: number;
+  displayName: string;
+  avatarPath: string | null;
+  theme: string;
+  accentColor: string;
+  startInFullscreen: boolean;
 };
 
 export type GameImport = Pick<Game, "title" | "executablePath">;
@@ -66,6 +81,22 @@ const migrations = [
       CREATE INDEX idx_collection_games_game ON collection_games(game_id);
     `,
   },
+  {
+    version: 4,
+    name: "create_profiles_and_settings",
+    up: `
+      CREATE TABLE profiles (
+        id INTEGER PRIMARY KEY,
+        display_name TEXT NOT NULL DEFAULT 'Player 1',
+        avatar_path TEXT,
+        theme TEXT NOT NULL DEFAULT 'dark',
+        accent_color TEXT NOT NULL DEFAULT 'lime',
+        start_in_fullscreen INTEGER NOT NULL DEFAULT 0 CHECK (start_in_fullscreen IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO profiles (id, display_name) VALUES (1, 'Player 1');
+    `,
+  },
 ] as const;
 
 export class Database {
@@ -112,7 +143,7 @@ export class Database {
 
   getGames(): Game[] {
     const rows = this.connection.prepare(`
-      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite
+      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite, description, cover_path, developer, publisher, genres, release_date
       FROM games
       ORDER BY title COLLATE NOCASE ASC
     `).all() as Array<{
@@ -123,6 +154,12 @@ export class Database {
       last_played_at: string | null;
       playtime_seconds: number;
       is_favorite: number;
+      description: string | null;
+      cover_path: string | null;
+      developer: string | null;
+      publisher: string | null;
+      genres: string | null;
+      release_date: string | null;
     }>;
 
     return rows.map((game) => ({
@@ -133,6 +170,12 @@ export class Database {
       lastPlayedAt: game.last_played_at,
       playtimeSeconds: game.playtime_seconds,
       isFavorite: game.is_favorite === 1,
+      description: game.description,
+      coverPath: game.cover_path,
+      developer: game.developer,
+      publisher: game.publisher,
+      genres: game.genres,
+      releaseDate: game.release_date,
     }));
   }
 
@@ -159,6 +202,78 @@ export class Database {
 
     const result = this.connection.prepare("INSERT INTO collections (name) VALUES (?)").run(trimmedName);
     return { id: Number(result.lastInsertRowid), name: trimmedName, gameCount: 0 };
+  }
+
+  getProfile(): Profile {
+    const row = this.connection.prepare("SELECT * FROM profiles WHERE id = 1").get() as {
+      id: number;
+      display_name: string;
+      avatar_path: string | null;
+      theme: string;
+      accent_color: string;
+      start_in_fullscreen: number;
+    };
+    return {
+      id: row.id,
+      displayName: row.display_name,
+      avatarPath: row.avatar_path,
+      theme: row.theme,
+      accentColor: row.accent_color,
+      startInFullscreen: row.start_in_fullscreen === 1,
+    };
+  }
+
+  updateProfile(name: string, avatarPath: string | null): void {
+    const trimmedName = name.trim();
+    if (trimmedName.length < 1 || trimmedName.length > 50) throw new Error("Name must be 1–50 characters.");
+    this.connection.prepare("UPDATE profiles SET display_name = ?, avatar_path = ? WHERE id = 1").run(trimmedName, avatarPath);
+  }
+
+  updateSettings(theme: string, accentColor: string, startInFullscreen: boolean): void {
+    this.connection.prepare("UPDATE profiles SET theme = ?, accent_color = ?, start_in_fullscreen = ? WHERE id = 1")
+      .run(theme, accentColor, startInFullscreen ? 1 : 0);
+  }
+
+  recordGameStart(gameId: number): void {
+    this.connection.prepare("UPDATE games SET last_played_at = datetime('now', 'localtime') WHERE id = ?").run(gameId);
+  }
+
+  incrementPlaytime(gameId: number, seconds: number): void {
+    if (seconds < 0) return;
+    this.connection.prepare("UPDATE games SET playtime_seconds = playtime_seconds + ? WHERE id = ?").run(seconds, gameId);
+  }
+
+  updateGameMetadata(gameId: number, metadata: {
+    description?: string | null;
+    coverPath?: string | null;
+    developer?: string | null;
+    publisher?: string | null;
+    genres?: string | null;
+    releaseDate?: string | null;
+  }): void {
+    const current = this.connection.prepare(
+      "SELECT description, cover_path, developer, publisher, genres, release_date FROM games WHERE id = ?"
+    ).get(gameId) as any;
+    if (!current) throw new Error("Game not found.");
+
+    this.connection.prepare(`
+      UPDATE games SET
+        description = ?,
+        cover_path = ?,
+        developer = ?,
+        publisher = ?,
+        genres = ?,
+        release_date = ?
+      WHERE id = ?
+    `).run(
+      metadata.description !== undefined ? metadata.description : current.description,
+      metadata.coverPath !== undefined ? metadata.coverPath : current.cover_path,
+      metadata.developer !== undefined ? metadata.developer : current.developer,
+      metadata.publisher !== undefined ? metadata.publisher : current.publisher,
+      metadata.genres !== undefined ? metadata.genres : current.genres,
+      metadata.releaseDate !== undefined ? metadata.releaseDate : current.release_date,
+      gameId
+    );
   }
 
   private runMigrations(): void {

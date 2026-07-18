@@ -13,11 +13,23 @@ declare global {
       chooseAndImportGames: () => Promise<{ canceled: boolean; imported: number }>;
       setGameFavorite: (gameId: number, isFavorite: boolean) => Promise<void>;
       createCollection: (name: string) => Promise<Collection>;
+      
+      // Profile & Settings
+      getProfile: () => Promise<Profile>;
+      updateProfile: (name: string, avatarPath: string | null) => Promise<void>;
+      updateSettings: (theme: string, accentColor: string, startInFullscreen: boolean) => Promise<void>;
+
+      // Game Launcher & Metadata
+      launchGame: (gameId: number) => Promise<void>;
+      updateGameMetadata: (gameId: number, metadata: Partial<Game>) => Promise<void>;
+
+      // Events
+      onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => () => void;
     };
   }
 }
 
-type Game = {
+export type Game = {
   id: number;
   title: string;
   executablePath: string;
@@ -25,7 +37,22 @@ type Game = {
   lastPlayedAt: string | null;
   playtimeSeconds: number;
   isFavorite: boolean;
+  description?: string | null;
+  coverPath?: string | null;
+  developer?: string | null;
+  publisher?: string | null;
+  genres?: string | null;
+  releaseDate?: string | null;
 };
 
-type Collection = { id: number; name: string; gameCount: number };
-type LibraryState = { games: Game[]; collections: Collection[] };
+export type Profile = {
+  id: number;
+  displayName: string;
+  avatarPath: string | null;
+  theme: string;
+  accentColor: string;
+  startInFullscreen: boolean;
+};
+
+export type Collection = { id: number; name: string; gameCount: number };
+export type LibraryState = { games: Game[]; collections: Collection[] };

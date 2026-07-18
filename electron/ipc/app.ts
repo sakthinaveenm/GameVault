@@ -1,6 +1,7 @@
 import { dialog, ipcMain } from "electron";
 import type { Database } from "../database/database.js";
 import { scanForGames } from "../services/game-scanner.js";
+import { launchGame } from "../launcher/launcher.js";
 
 export function registerAppIpc(database: Database): void {
   ipcMain.handle("app:get-info", () => ({
@@ -30,5 +31,38 @@ export function registerAppIpc(database: Database): void {
 
     const games = await scanForGames(selection.filePaths[0]);
     return { canceled: false, imported: database.importGames(games) };
+  });
+
+  // Profile IPC Handlers
+  ipcMain.handle("profile:get", () => {
+    return database.getProfile();
+  });
+
+  ipcMain.handle("profile:update", (_event, name: unknown, avatarPath: unknown) => {
+    if (typeof name !== "string" || (avatarPath !== null && typeof avatarPath !== "string")) {
+      throw new Error("Invalid request.");
+    }
+    database.updateProfile(name, avatarPath);
+  });
+
+  ipcMain.handle("profile:update-settings", (_event, theme: unknown, accentColor: unknown, startInFullscreen: unknown) => {
+    if (typeof theme !== "string" || typeof accentColor !== "string" || typeof startInFullscreen !== "boolean") {
+      throw new Error("Invalid request.");
+    }
+    database.updateSettings(theme, accentColor, startInFullscreen);
+  });
+
+  // Launch Game Handler
+  ipcMain.handle("library:launch-game", (_event, gameId: unknown) => {
+    if (typeof gameId !== "number") throw new Error("Invalid request.");
+    launchGame(database, gameId);
+  });
+
+  // Metadata Updates
+  ipcMain.handle("library:update-metadata", (_event, gameId: unknown, metadata: unknown) => {
+    if (typeof gameId !== "number" || typeof metadata !== "object" || metadata === null) {
+      throw new Error("Invalid request.");
+    }
+    database.updateGameMetadata(gameId, metadata as any);
   });
 }
