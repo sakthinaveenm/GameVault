@@ -72,6 +72,14 @@ contextBridge.exposeInMainWorld("gameVault", {
   toggleGameCompleted: (gameId: number, completed: boolean) => ipcRenderer.invoke("games:toggle-completed", gameId, completed),
   getLaunchTimeline: () => ipcRenderer.invoke("library:get-timeline"),
 
+  // Plugins & Extensions
+  getInstalledPlugins: () => ipcRenderer.invoke("plugins:get"),
+  installPlugin: (id: string, name: string, description: string, author: string, version: string, type: string, config: string, code: string) =>
+    ipcRenderer.invoke("plugins:install", id, name, description, author, version, type, config, code),
+  uninstallPlugin: (id: string) => ipcRenderer.invoke("plugins:uninstall", id),
+  setPluginEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke("plugins:toggle", id, enabled),
+  updatePluginConfig: (id: string, config: string) => ipcRenderer.invoke("plugins:configure", id, config),
+
   // Events
   onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => {
     const listener = (_event: any, data: any) => callback(data);

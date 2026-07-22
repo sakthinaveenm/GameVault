@@ -200,6 +200,27 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_achievements_game ON achievements(game_id);
     `,
   },
+  {
+    version: 13,
+    name: "add_v1_5_plugins_table",
+    up: `
+      CREATE TABLE IF NOT EXISTS plugins (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        author TEXT NOT NULL,
+        version TEXT NOT NULL,
+        type TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+        config TEXT,
+        code TEXT
+      );
+      INSERT OR IGNORE INTO plugins (id, name, description, author, version, type, enabled, config, code)
+      VALUES 
+        ('discord-rpc', 'Discord Rich Presence', 'Displays active game playtime details onto your Discord status.', 'GameVault Core', '1.0.0', 'integration', 0, '{}', ''),
+        ('cyberpunk-neon', 'Cyberpunk Neon Theme', 'Injects a dynamic dark neon cyberpunk green/pink color palette to GameVault.', 'NeoStyles', '1.2.0', 'theme', 0, '{"primary":"#050508","secondary":"#0f0a1c","accent":"#ff0055","accentHover":"#ff3377","text":"#00ffcc"}', '');
+    `,
+  },
 ] as const;
 
 export class Database {
@@ -737,6 +758,50 @@ export class Database {
       launchedAt: row.launched_at,
       durationSeconds: row.duration_seconds,
     }));
+  }
+
+  getInstalledPlugins(): Array<{ id: string; name: string; description: string; author: string; version: string; type: string; enabled: boolean; config: string; code: string }> {
+    const rows = this.connection.prepare("SELECT id, name, description, author, version, type, enabled, config, code FROM plugins").all() as Array<{
+      id: string;
+      name: string;
+      description: string;
+      author: string;
+      version: string;
+      type: string;
+      enabled: number;
+      config: string;
+      code: string;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      author: row.author,
+      version: row.version,
+      type: row.type,
+      enabled: row.enabled === 1,
+      config: row.config,
+      code: row.code,
+    }));
+  }
+
+  installPlugin(id: string, name: string, description: string, author: string, version: string, type: string, config: string, code: string): void {
+    this.connection.prepare(`
+      INSERT OR REPLACE INTO plugins (id, name, description, author, version, type, enabled, config, code)
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+    `).run(id, name, description, author, version, type, config, code);
+  }
+
+  uninstallPlugin(id: string): void {
+    this.connection.prepare("DELETE FROM plugins WHERE id = ?").run(id);
+  }
+
+  setPluginEnabled(id: string, enabled: boolean): void {
+    this.connection.prepare("UPDATE plugins SET enabled = ? WHERE id = ?").run(enabled ? 1 : 0, id);
+  }
+
+  updatePluginConfig(id: string, config: string): void {
+    this.connection.prepare("UPDATE plugins SET config = ? WHERE id = ?").run(config, id);
   }
 
   private runMigrations(): void {

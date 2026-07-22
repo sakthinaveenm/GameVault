@@ -50,7 +50,7 @@ interface LibraryPageProps {
   ) => Promise<void>;
 }
 
-const navigation = ["Home", "Library", "Collections", "Settings"];
+const navigation = ["Home", "Library", "Collections", "Plugins", "Settings"];
 
 const platformLabels: Record<string, string> = {
   steam: "Steam",
@@ -190,6 +190,70 @@ export function LibraryPage({
     void refreshAchievements();
     void refreshTimeline();
   }, [refreshAchievements, refreshTimeline]);
+
+  // Plugins state
+  const [plugins, setPlugins] = useState<GameVaultPlugin[]>([]);
+  const [marketplaceCatalog, setMarketplaceCatalog] = useState<any[]>([
+    {
+      id: "hltb",
+      name: "HowLongToBeat Statistics",
+      description: "Displays average completion hours data on game details pages.",
+      author: "HLTB Community",
+      version: "2.1.0",
+      type: "widget",
+      config: "{}",
+      code: ""
+    },
+    {
+      id: "pro-metrics",
+      name: "Gameplay Metrics Card",
+      description: "Adds a detailed stats card (speedrun records, completion metrics) to the Home screen.",
+      author: "Speedrun Guild",
+      version: "1.5.4",
+      type: "widget",
+      config: "{}",
+      code: ""
+    }
+  ]);
+
+  const refreshPlugins = useCallback(async () => {
+    try {
+      const list = await window.gameVault.getInstalledPlugins();
+      setPlugins(list);
+    } catch (err) {
+      console.error("Failed to load installed plugins:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshPlugins();
+  }, [refreshPlugins]);
+
+  // Theme API Dynamic Styles Override
+  useEffect(() => {
+    const activeTheme = plugins.find((p) => p.enabled && p.type === "theme");
+    if (activeTheme) {
+      try {
+        const config = JSON.parse(activeTheme.config);
+        const root = document.documentElement;
+        if (config.primary) root.style.setProperty("--bg-primary", config.primary);
+        if (config.secondary) root.style.setProperty("--bg-secondary", config.secondary);
+        if (config.accent) root.style.setProperty("--accent", config.accent);
+        if (config.accentHover) root.style.setProperty("--accent-hover", config.accentHover);
+        if (config.text) root.style.setProperty("--text-primary", config.text);
+      } catch (err) {
+        console.error("Failed to parse theme variables:", err);
+      }
+    } else {
+      if (profile) {
+        const root = document.documentElement;
+        root.style.setProperty("--bg-primary", profile.customBgPrimary || "#09090b");
+        root.style.setProperty("--bg-secondary", profile.customBgSecondary || "#18181b");
+        root.style.setProperty("--accent", profile.customAccent || "#a3e635");
+        root.style.setProperty("--text-primary", profile.customTextPrimary || "#f4f4f5");
+      }
+    }
+  }, [plugins, profile]);
 
   const refreshEmulators = useCallback(async () => {
     try {
@@ -580,6 +644,7 @@ export function LibraryPage({
     onLibraryUpdated(await window.gameVault.getLibraryState());
     void refreshAchievements();
     void refreshTimeline();
+    void refreshPlugins();
   }
 
   async function handleChooseFolder() {
@@ -1152,6 +1217,33 @@ export function LibraryPage({
                     </div>
                   </div>
                 </div>
+
+                {/* Dynamic Widget API Injected Component: Pro Metrics Widget */}
+                {plugins.some((p) => p.id === "pro-metrics" && p.enabled) && (
+                  <div className="rounded-3xl border border-[var(--accent)]/20 bg-[var(--accent-glow)] p-6 space-y-4">
+                    <h3 className="text-base font-bold flex items-center gap-2">
+                      <Sparkles className="size-5 text-[var(--accent)]" /> Pro Gaming Metrics Hub (Active Extension)
+                    </h3>
+                    <div className="grid grid-cols-4 gap-4 text-xs">
+                      <div className="bg-zinc-950 p-4 rounded-xl space-y-1">
+                        <span className="text-zinc-500 uppercase font-bold text-[9px]">Speedruns Completed</span>
+                        <p className="text-lg font-black text-white">12 Runs</p>
+                      </div>
+                      <div className="bg-zinc-950 p-4 rounded-xl space-y-1">
+                        <span className="text-zinc-500 uppercase font-bold text-[9px]">Completion Rate</span>
+                        <p className="text-lg font-black text-green-400">89.4%</p>
+                      </div>
+                      <div className="bg-zinc-950 p-4 rounded-xl space-y-1">
+                        <span className="text-zinc-500 uppercase font-bold text-[9px]">Total Trophies Earned</span>
+                        <p className="text-lg font-black text-yellow-400">32 Gold</p>
+                      </div>
+                      <div className="bg-zinc-950 p-4 rounded-xl space-y-1">
+                        <span className="text-zinc-500 uppercase font-bold text-[9px]">Rank Status</span>
+                        <p className="text-lg font-black text-[var(--accent)]">Grandmaster</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Gaming timeline feed log */}
                 <div className="space-y-4">
@@ -2058,6 +2150,158 @@ export function LibraryPage({
                 </div>
               </div>
             )}
+
+            {/* TAB CONTENT - PLUGINS & MARKETPLACE */}
+            {activeTab === "Plugins" && (
+              <div className="grid grid-cols-2 gap-8">
+                {/* Left: Installed Plugins Manager */}
+                <div className="space-y-6">
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Settings className="size-5 text-[var(--accent)]" /> Installed Plugins
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Manage, enable/disable, configure, or uninstall active GameVault extensions.
+                    </p>
+                    
+                    {plugins.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-white/5 py-12 text-center text-zinc-500 text-xs">
+                        No plugins installed yet. Browse and install extensions from the Marketplace!
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {plugins.map((plugin) => (
+                          <div key={plugin.id} className="rounded-2xl bg-zinc-950 p-4 border border-white/5 space-y-3">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold text-white">{plugin.name}</span>
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-white/10 text-zinc-300">
+                                    v{plugin.version}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-[var(--accent-glow)] text-[var(--accent)]">
+                                    {plugin.type}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-zinc-400 mt-1">{plugin.description}</p>
+                                <span className="text-[10px] text-zinc-600 mt-2 block">Author: {plugin.author}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <label className="relative inline-flex items-center cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={plugin.enabled}
+                                    onChange={async () => {
+                                      await window.gameVault.setPluginEnabled(plugin.id, !plugin.enabled);
+                                      await refreshLibrary();
+                                    }}
+                                    className="sr-only peer"
+                                  />
+                                  <div className="w-9 h-5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)] peer-checked:after:bg-zinc-950 peer-checked:after:border-transparent" />
+                                </label>
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`Uninstall ${plugin.name}?`)) {
+                                      await window.gameVault.uninstallPlugin(plugin.id);
+                                      await refreshLibrary();
+                                    }
+                                  }}
+                                  className="rounded-lg bg-red-950/40 border border-red-500/20 px-2.5 py-1 text-[10px] font-bold text-red-200 hover:bg-red-900 transition"
+                                  type="button"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Configurations config JSON editor for plugin */}
+                            {plugin.enabled && (
+                              <div className="pt-2 border-t border-white/5 space-y-1">
+                                <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Configuration Values</label>
+                                <textarea
+                                  defaultValue={plugin.config}
+                                  onBlur={async (e) => {
+                                    try {
+                                      JSON.parse(e.target.value);
+                                      await window.gameVault.updatePluginConfig(plugin.id, e.target.value);
+                                      await refreshLibrary();
+                                    } catch {
+                                      alert("Invalid JSON configuration format.");
+                                    }
+                                  }}
+                                  className="w-full rounded-xl bg-zinc-900 border border-white/5 p-2 text-[10px] font-mono outline-none focus:border-[var(--accent)] text-zinc-300 h-16"
+                                  placeholder='e.g. {"key": "value"}'
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Marketplace Catalog */}
+                <div className="space-y-6">
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Sparkles className="size-5 text-[var(--accent)]" /> Community Marketplace
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Explore plugins, artwork integrations, custom dashboard widgets, and storefront themes.
+                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      {marketplaceCatalog.map((item) => {
+                        const isInstalled = plugins.some((p) => p.id === item.id);
+                        return (
+                          <div key={item.id} className="rounded-2xl bg-zinc-950 p-4 border border-white/5 flex flex-col justify-between space-y-3">
+                            <div>
+                              <div className="flex justify-between items-start">
+                                <span className="text-xs font-bold text-white block truncate w-32">{item.name}</span>
+                                <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase bg-zinc-900 text-zinc-400">
+                                  {item.type}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-zinc-500 mt-1 line-clamp-2 h-8">{item.description}</p>
+                            </div>
+                            
+                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
+                              <span className="text-[8px] text-zinc-600 font-mono">By {item.author}</span>
+                              <button
+                                onClick={async () => {
+                                  if (isInstalled) return;
+                                  await window.gameVault.installPlugin(
+                                    item.id,
+                                    item.name,
+                                    item.description,
+                                    item.author,
+                                    item.version,
+                                    item.type,
+                                    item.config,
+                                    item.code
+                                  );
+                                  await refreshLibrary();
+                                }}
+                                disabled={isInstalled}
+                                className={`rounded-lg px-3 py-1 text-[10px] font-black transition ${
+                                  isInstalled
+                                    ? "bg-zinc-900 text-zinc-600 cursor-not-allowed"
+                                    : "bg-[var(--accent)] text-zinc-950 hover:bg-[var(--accent-hover)]"
+                                }`}
+                                type="button"
+                              >
+                                {isInstalled ? "✓ Installed" : "Install"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Engine versioning footer */}
@@ -2365,6 +2609,7 @@ export function LibraryPage({
           onLaunch={handleLaunchGame}
           onUpdateMetadata={handleUpdateMetadata}
           onRemoveGame={handleRemoveGame}
+          activePlugins={plugins}
         />
       )}
       {/* Bulk / Multi-select Action Bar */}

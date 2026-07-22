@@ -328,18 +328,18 @@ GameVault/
 
 ### Plugin System
 
-* [ ] Plugin Manager
-* [ ] Plugin Marketplace
-* [ ] Install plugins inside GameVault
-* [ ] Plugin API
-* [ ] Theme API
-* [ ] Widget API
+* [x] Plugin Manager
+* [x] Plugin Marketplace
+* [x] Install plugins inside GameVault
+* [x] Plugin API
+* [x] Theme API
+* [x] Widget API
 
 ### Community
 
-* [ ] Community themes
-* [ ] Community plugins
-* [ ] Community artwork packs
+* [x] Community themes
+* [x] Community plugins
+* [x] Community artwork packs
 
 ---
 

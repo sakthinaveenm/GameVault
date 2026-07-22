@@ -415,6 +415,45 @@ export function registerAppIpc(database: Database): void {
   ipcMain.handle("library:get-timeline", () => {
     return database.getLaunchTimeline();
   });
+
+  ipcMain.handle("plugins:get", () => {
+    return database.getInstalledPlugins();
+  });
+
+  ipcMain.handle("plugins:install", (_event, id: unknown, name: unknown, description: unknown, author: unknown, version: unknown, type: unknown, config: unknown, code: unknown) => {
+    if (
+      typeof id !== "string" ||
+      typeof name !== "string" ||
+      typeof description !== "string" ||
+      typeof author !== "string" ||
+      typeof version !== "string" ||
+      typeof type !== "string" ||
+      typeof config !== "string" ||
+      typeof code !== "string"
+    ) {
+      throw new Error("Invalid request.");
+    }
+    database.installPlugin(id, name, description, author, version, type, config, code);
+    return true;
+  });
+
+  ipcMain.handle("plugins:uninstall", (_event, id: unknown) => {
+    if (typeof id !== "string") throw new Error("Invalid request.");
+    database.uninstallPlugin(id);
+    return true;
+  });
+
+  ipcMain.handle("plugins:toggle", (_event, id: unknown, enabled: unknown) => {
+    if (typeof id !== "string" || typeof enabled !== "boolean") throw new Error("Invalid request.");
+    database.setPluginEnabled(id, enabled);
+    return true;
+  });
+
+  ipcMain.handle("plugins:configure", (_event, id: unknown, config: unknown) => {
+    if (typeof id !== "string" || typeof config !== "string") throw new Error("Invalid request.");
+    database.updatePluginConfig(id, config);
+    return true;
+  });
 }
 
 async function scanForRoms(directory: string, extensionsList: string[]): Promise<Array<{ title: string; path: string }>> {

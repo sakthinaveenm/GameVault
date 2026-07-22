@@ -65,6 +65,13 @@ declare global {
       toggleGameCompleted: (gameId: number, completed: boolean) => Promise<void>;
       getLaunchTimeline: () => Promise<Array<{ id: number; gameTitle: string; platform: string; coverPath: string | null; launchedAt: string; durationSeconds: number }>>;
 
+      // Plugins & Extensions
+      getInstalledPlugins: () => Promise<GameVaultPlugin[]>;
+      installPlugin: (id: string, name: string, description: string, author: string, version: string, type: string, config: string, code: string) => Promise<void>;
+      uninstallPlugin: (id: string) => Promise<void>;
+      setPluginEnabled: (id: string, enabled: boolean) => Promise<void>;
+      updatePluginConfig: (id: string, config: string) => Promise<void>;
+
       // Events
       onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => () => void;
     };
@@ -126,4 +133,16 @@ export type Achievement = {
   unlocked: boolean;
   unlockedAt: string | null;
   showcased: boolean;
+};
+
+export type GameVaultPlugin = {
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  version: string;
+  type: string;
+  enabled: boolean;
+  config: string;
+  code: string;
 };

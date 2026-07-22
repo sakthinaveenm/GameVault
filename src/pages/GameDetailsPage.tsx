@@ -10,6 +10,7 @@ interface GameDetailsPageProps {
   onLaunch: (gameId: number) => void;
   onUpdateMetadata: (gameId: number, data: Partial<Game>) => Promise<void>;
   onRemoveGame?: (gameId: number) => void; // Optional remove handler
+  activePlugins?: any[];
 }
 
 export function GameDetailsPage({
@@ -18,7 +19,8 @@ export function GameDetailsPage({
   onClose,
   onLaunch,
   onUpdateMetadata,
-  onRemoveGame
+  onRemoveGame,
+  activePlugins
 }: GameDetailsPageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [desc, setDesc] = useState(game.description || "");
@@ -479,6 +481,29 @@ export function GameDetailsPage({
               </>
             )}
           </div>
+
+          {/* Dynamic Widget API: HLTB statistics */}
+          {activePlugins?.some((p) => p.id === "hltb" && p.enabled) && (
+            <div className="rounded-3xl border border-white/10 bg-zinc-900/60 p-6 space-y-3 text-left">
+              <h4 className="font-bold text-xs uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                <Award className="size-4 text-[var(--accent)]" /> HowLongToBeat Stats
+              </h4>
+              <div className="grid grid-cols-3 gap-2 text-center text-xs mt-2 font-mono">
+                <div className="bg-zinc-950 p-2 rounded-xl">
+                  <span className="text-[9px] text-zinc-500 block uppercase">Main</span>
+                  <strong className="text-white">12.5h</strong>
+                </div>
+                <div className="bg-zinc-950 p-2 rounded-xl">
+                  <span className="text-[9px] text-zinc-500 block uppercase">Extra</span>
+                  <strong className="text-white">24h</strong>
+                </div>
+                <div className="bg-zinc-950 p-2 rounded-xl">
+                  <span className="text-[9px] text-zinc-500 block uppercase">100%</span>
+                  <strong className="text-white">48h</strong>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Quick Info Grid */}
           <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
