@@ -137,6 +137,9 @@ export function LibraryPage({
 
   // Keyboard navigation index state
   const [focusedGameIndex, setFocusedGameIndex] = useState<number | null>(null);
+  
+  const [deckMode, setDeckMode] = useState(false);
+  const [deckSelectedIndex, setDeckSelectedIndex] = useState(0);
 
   // Custom Toast System state
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: "info" | "success" | "warning" }>>([]);
@@ -273,6 +276,9 @@ export function LibraryPage({
   const [gpuUsage, setGpuUsage] = useState(45);
   const [ramUsage, setRamUsage] = useState(58);
 
+  const [aiSuggestion, setAiSuggestion] = useState("Based on your play pattern of action-adventure games, we recommend launching Hades for a fast-paced rogue-like session.");
+  const [isQueryingAi, setIsQueryingAi] = useState(false);
+
   // Sync state with profile updates
   useEffect(() => {
     if (profile) {
@@ -329,6 +335,36 @@ export function LibraryPage({
       void refreshEmulators();
     }
   }, [activeTab, refreshEmulators]);
+
+  // Listen for Deck Mode keyboard navigation keys
+  useEffect(() => {
+    if (!deckMode) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const gameCount = library.games.length;
+      if (gameCount === 0) return;
+
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setDeckSelectedIndex((prev) => Math.min(prev + 1, gameCount - 1));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setDeckSelectedIndex((prev) => Math.max(prev - 1, 0));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const selectedGame = library.games[deckSelectedIndex];
+        if (selectedGame) {
+          handleLaunchGame(selectedGame.id);
+        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setDeckMode(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deckMode, deckSelectedIndex, library.games, handleLaunchGame]);
 
   // Advanced Filtering state
   const [playtimeFilter, setPlaytimeFilter] = useState<"all" | "short" | "medium" | "long">("all");
@@ -1047,6 +1083,17 @@ export function LibraryPage({
               
               <div className="flex items-center gap-3">
                 <button
+                  onClick={() => {
+                    setDeckMode(true);
+                    setDeckSelectedIndex(0);
+                    sounds.playConfirm();
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10 focus:outline-2 focus:outline-[var(--accent)] transition flex items-center gap-1.5"
+                  type="button"
+                >
+                  🎮 Deck Mode
+                </button>
+                <button
                   {...focusProps}
                   className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10 focus:outline-2 focus:outline-[var(--accent)] transition"
                   onClick={() => void onBigPictureChange(!isBigPicture)}
@@ -1098,6 +1145,45 @@ export function LibraryPage({
                     <div>
                       <p className="text-xs text-zinc-500 font-semibold uppercase">Favorites</p>
                       <p className="text-2xl font-black">{totalFavoritesCount}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Recommendations Panel */}
+                <div className="rounded-3xl border border-white/10 bg-zinc-900/60 p-6 space-y-4 text-left">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Sparkles className="size-5 text-[var(--accent)]" /> AI Assistant Co-Pilot
+                    </h3>
+                    <button
+                      onClick={async () => {
+                        setIsQueryingAi(true);
+                        sounds.playConfirm();
+                        try {
+                          const res = await window.gameVault.aiRecommend();
+                          setAiSuggestion(res);
+                        } catch (err: any) {
+                          setAiSuggestion(`AI error: ${err.message || err}`);
+                        } finally {
+                          setIsQueryingAi(false);
+                        }
+                      }}
+                      disabled={isQueryingAi}
+                      className="rounded-xl bg-white/5 border border-white/10 px-3 py-1.5 text-xs font-bold text-zinc-300 hover:bg-white/10 flex items-center gap-1.5 transition disabled:opacity-50"
+                      type="button"
+                    >
+                      <RefreshCw className={`size-3.5 ${isQueryingAi ? "animate-spin text-[var(--accent)]" : ""}`} />
+                      {isQueryingAi ? "Analyzing..." : "Get Suggestion"}
+                    </button>
+                  </div>
+                  
+                  <div className="bg-zinc-950/80 border border-white/5 rounded-2xl p-4 flex gap-4 items-start">
+                    <div className="text-2xl pt-1">🧠</div>
+                    <div className="space-y-1.5 flex-1">
+                      <span className="text-[9px] text-[var(--accent)] font-bold uppercase tracking-wider block">Smart Recommendation</span>
+                      <p className="text-xs text-zinc-300 leading-relaxed font-medium">
+                        {aiSuggestion}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1752,6 +1838,23 @@ export function LibraryPage({
                         type="checkbox"
                         checked={showHiddenGames}
                         onChange={(e) => setShowHiddenGames(e.target.checked)}
+                        className="accent-[var(--accent)] size-4 cursor-pointer"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between gap-4 rounded-xl bg-zinc-950 p-4 cursor-pointer border border-white/5 hover:bg-zinc-900 transition mt-3">
+                      <div>
+                        <span className="text-sm font-semibold block">Portable Execution Mode</span>
+                        <span className="text-[10px] text-zinc-500">Store database configurations locally inside app root folder.</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={profile.portableMode || false}
+                        onChange={async (e) => {
+                          await window.gameVault.updatePortableMode(e.target.checked);
+                          await refreshLibrary();
+                          sounds.playConfirm();
+                        }}
                         className="accent-[var(--accent)] size-4 cursor-pointer"
                       />
                     </label>
@@ -2787,6 +2890,107 @@ export function LibraryPage({
                 Cancel Import
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Steam Deck Controller Mode Overlay */}
+      {deckMode && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-between bg-zinc-950 text-white p-12 select-none animate-fade-in font-sans">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-6">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🎮</span>
+              <div>
+                <h2 className="text-lg font-black tracking-wider uppercase text-[var(--accent)]">GameVault Deck Mode</h2>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase">Controller & Keyboard Optimized UI</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setDeckMode(false)}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold hover:bg-white/10"
+              type="button"
+            >
+              Exit Console Mode (Esc)
+            </button>
+          </div>
+
+          {/* Centerpiece: Active Selection Detail Display */}
+          {library.games.length > 0 ? (
+            <div className="flex flex-col items-center justify-center space-y-6 my-auto text-center">
+              <div className="relative group max-w-sm rounded-3xl overflow-hidden border-4 border-[var(--accent)] shadow-[0_0_50px_var(--accent-glow)] scale-[1.05] transition-all duration-300">
+                {library.games[deckSelectedIndex]?.coverPath ? (
+                  <img
+                    src={`file://${library.games[deckSelectedIndex].coverPath}`}
+                    alt=""
+                    className="w-48 h-64 object-cover"
+                  />
+                ) : (
+                  <div className="w-48 h-64 bg-zinc-900 flex items-center justify-center text-zinc-700">
+                    No Art
+                  </div>
+                )}
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-white uppercase">{library.games[deckSelectedIndex]?.title}</h1>
+                <p className="text-xs text-zinc-400 mt-1 uppercase font-bold tracking-wider font-mono">
+                  Platform: {library.games[deckSelectedIndex]?.platform} · Playtime: {formatPlaytime(library.games[deckSelectedIndex]?.playtimeSeconds || 0)}
+                </p>
+              </div>
+              <button
+                onClick={() => handleLaunchGame(library.games[deckSelectedIndex].id)}
+                className="rounded-full bg-[var(--accent)] text-zinc-950 px-8 py-3 text-sm font-black uppercase hover:bg-[var(--accent-hover)] tracking-widest hover:scale-[1.05] transition"
+                type="button"
+              >
+                Press Enter to Start
+              </button>
+            </div>
+          ) : (
+            <div className="text-center text-zinc-500 my-auto">
+              No games installed in Vault library.
+            </div>
+          )}
+
+          {/* Carousel Row Selection of Library games */}
+          {library.games.length > 0 && (
+            <div className="flex flex-col space-y-3">
+              <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Library Carousel</h4>
+              <div className="flex items-center gap-4 overflow-x-auto pb-4 scroll-smooth">
+                {library.games.map((g, idx) => {
+                  const isSelected = idx === deckSelectedIndex;
+                  return (
+                    <div
+                      key={g.id}
+                      onClick={() => setDeckSelectedIndex(idx)}
+                      className={`relative flex-shrink-0 cursor-pointer rounded-2xl overflow-hidden border-2 transition-all duration-200 ${
+                        isSelected
+                          ? "border-[var(--accent)] scale-110 bg-zinc-900 shadow-[0_0_15px_var(--accent-glow)]"
+                          : "border-white/5 opacity-55 hover:opacity-80 scale-95"
+                      }`}
+                    >
+                      {g.coverPath ? (
+                        <img
+                          src={`file://${g.coverPath}`}
+                          alt=""
+                          className="w-20 h-28 object-cover"
+                        />
+                      ) : (
+                        <div className="w-20 h-28 bg-zinc-900 flex items-center justify-center text-[10px] text-zinc-600 text-center px-1">
+                          {g.title}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Keys Info footer */}
+          <div className="flex justify-between items-center text-[10px] text-zinc-600 border-t border-white/10 pt-4 font-mono font-bold uppercase">
+            <span>← / → Navigate Games</span>
+            <span>Enter to Launch</span>
+            <span>Escape to Return</span>
           </div>
         </div>
       )}

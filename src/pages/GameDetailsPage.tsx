@@ -334,7 +334,23 @@ export function GameDetailsPage({
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs font-semibold uppercase text-zinc-500">Description</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-semibold uppercase text-zinc-500">Description</label>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await window.gameVault.aiEnhanceMetadata(game.id);
+                          setDesc(res);
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }}
+                      className="text-[10px] font-bold text-[var(--accent)] hover:underline flex items-center gap-1"
+                      type="button"
+                    >
+                      🪄 Generate with AI
+                    </button>
+                  </div>
                   <textarea
                     rows={4}
                     value={desc}

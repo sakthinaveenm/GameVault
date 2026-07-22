@@ -88,6 +88,12 @@ contextBridge.exposeInMainWorld("gameVault", {
   updateCloudAccount: (email: string | null, lastSyncAt: string | null) =>
     ipcRenderer.invoke("profile:update-cloud", email, lastSyncAt),
 
+  // GameVault Future Vision v2.1
+  aiRecommend: () => ipcRenderer.invoke("ai:recommend"),
+  aiEnhanceMetadata: (gameId: number) => ipcRenderer.invoke("ai:enhance-metadata", gameId),
+  updatePortableMode: (enabled: boolean) => ipcRenderer.invoke("profile:update-portable", enabled),
+  updateDeckMode: (enabled: boolean) => ipcRenderer.invoke("profile:update-deck", enabled),
+
   // Events
   onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => {
     const listener = (_event: any, data: any) => callback(data);

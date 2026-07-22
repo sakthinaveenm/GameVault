@@ -78,6 +78,12 @@ declare global {
       saveGameScripts: (gameId: number, preLaunch: string | null, postClose: string | null) => Promise<void>;
       updateCloudAccount: (email: string | null, lastSyncAt: string | null) => Promise<void>;
 
+      // GameVault Future Vision v2.1
+      aiRecommend: () => Promise<string>;
+      aiEnhanceMetadata: (gameId: number) => Promise<string>;
+      updatePortableMode: (enabled: boolean) => Promise<void>;
+      updateDeckMode: (enabled: boolean) => Promise<void>;
+
       // Events
       onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => () => void;
     };

@@ -41,6 +41,8 @@ export type Profile = {
   customAccent?: string;
   cloudEmail?: string | null;
   lastSyncAt?: string | null;
+  portableMode?: boolean;
+  deckModeEnabled?: boolean;
 };
 
 export type GameImport = Pick<Game, "title" | "executablePath">;
@@ -237,6 +239,14 @@ const migrations = [
       ALTER TABLE games ADD COLUMN post_close_script TEXT;
       ALTER TABLE profiles ADD COLUMN cloud_email TEXT;
       ALTER TABLE profiles ADD COLUMN last_sync_at TEXT;
+    `,
+  },
+  {
+    version: 15,
+    name: "add_future_vision_columns",
+    up: `
+      ALTER TABLE profiles ADD COLUMN portable_mode INTEGER NOT NULL DEFAULT 0 CHECK (portable_mode IN (0, 1));
+      ALTER TABLE profiles ADD COLUMN deck_mode_enabled INTEGER NOT NULL DEFAULT 0 CHECK (deck_mode_enabled IN (0, 1));
     `,
   },
 ] as const;
@@ -445,6 +455,8 @@ export class Database {
       custom_accent: string;
       cloud_email: string | null;
       last_sync_at: string | null;
+      portable_mode: number;
+      deck_mode_enabled: number;
     };
     return {
       id: row.id,
@@ -461,6 +473,8 @@ export class Database {
       customAccent: row.custom_accent,
       cloudEmail: row.cloud_email,
       lastSyncAt: row.last_sync_at,
+      portableMode: row.portable_mode === 1,
+      deckModeEnabled: row.deck_mode_enabled === 1,
     };
   }
 
@@ -838,6 +852,14 @@ export class Database {
 
   updateGameScripts(gameId: number, preLaunch: string | null, postClose: string | null): void {
     this.connection.prepare("UPDATE games SET pre_launch_script = ?, post_close_script = ? WHERE id = ?").run(preLaunch, postClose, gameId);
+  }
+
+  updatePortableMode(enabled: boolean): void {
+    this.connection.prepare("UPDATE profiles SET portable_mode = ? WHERE id = 1").run(enabled ? 1 : 0);
+  }
+
+  updateDeckMode(enabled: boolean): void {
+    this.connection.prepare("UPDATE profiles SET deck_mode_enabled = ? WHERE id = 1").run(enabled ? 1 : 0);
   }
 
   private runMigrations(): void {

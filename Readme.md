@@ -386,15 +386,15 @@ GameVault/
 
 ## 🌌 Future Vision
 
-* [ ] Linux support
-* [ ] macOS support
-* [ ] Steam Deck optimized UI
-* [ ] Portable Mode
+* [x] Linux support
+* [x] macOS support
+* [x] Steam Deck optimized UI
+* [x] Portable Mode
 * [ ] Remote streaming launcher
 * [ ] Mobile companion application
-* [ ] AI-powered game recommendations
-* [ ] AI metadata enhancement
-* [ ] AI library organization
+* [x] AI-powered game recommendations
+* [x] AI metadata enhancement
+* [x] AI library organization
 * [ ] Voice navigation
 * [ ] VR launcher mode
 

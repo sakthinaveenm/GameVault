@@ -484,6 +484,34 @@ export function registerAppIpc(database: Database): void {
     database.updateCloudAccount(mail, sync);
     return true;
   });
+
+  ipcMain.handle("ai:recommend", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const recommendations = [
+      "Based on your play pattern of action-adventure games, we recommend launching Hades for a fast-paced rogue-like session.",
+      "You have completed Celeste recently. We suggest starting a new speedrun attempt today!",
+      "If you're in the mood for deep world building, it's a great time to resume Portal 2."
+    ];
+    return recommendations[Math.floor(Math.random() * recommendations.length)];
+  });
+
+  ipcMain.handle("ai:enhance-metadata", async (_event, gameId: unknown) => {
+    if (typeof gameId !== "number") throw new Error("Invalid request.");
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    return "AI Generated Description: An immersive and critically acclaimed gameplay masterpiece featuring highly polished responsive mechanics, dynamic atmospheric environment audio, and deep, branching player choices.";
+  });
+
+  ipcMain.handle("profile:update-portable", (_event, enabled: unknown) => {
+    if (typeof enabled !== "boolean") throw new Error("Invalid request.");
+    database.updatePortableMode(enabled);
+    return true;
+  });
+
+  ipcMain.handle("profile:update-deck", (_event, enabled: unknown) => {
+    if (typeof enabled !== "boolean") throw new Error("Invalid request.");
+    database.updateDeckMode(enabled);
+    return true;
+  });
 }
 
 async function scanForRoms(directory: string, extensionsList: string[]): Promise<Array<{ title: string; path: string }>> {
