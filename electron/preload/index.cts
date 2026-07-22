@@ -94,6 +94,10 @@ contextBridge.exposeInMainWorld("gameVault", {
   updatePortableMode: (enabled: boolean) => ipcRenderer.invoke("profile:update-portable", enabled),
   updateDeckMode: (enabled: boolean) => ipcRenderer.invoke("profile:update-deck", enabled),
 
+  // GameVault Future Vision Final
+  toggleStreamHost: (enabled: boolean) => ipcRenderer.invoke("stream:toggle-host", enabled),
+  recognizeVoiceCommand: () => ipcRenderer.invoke("voice:recognize"),
+
   // Events
   onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => {
     const listener = (_event: any, data: any) => callback(data);

@@ -512,6 +512,18 @@ export function registerAppIpc(database: Database): void {
     database.updateDeckMode(enabled);
     return true;
   });
+
+  ipcMain.handle("stream:toggle-host", async (_event, enabled: unknown) => {
+    if (typeof enabled !== "boolean") throw new Error("Invalid request.");
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return true;
+  });
+
+  ipcMain.handle("voice:recognize", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const mockVoiceCommands = ["Hades", "Celeste", "Portal 2"];
+    return mockVoiceCommands[Math.floor(Math.random() * mockVoiceCommands.length)];
+  });
 }
 
 async function scanForRoms(directory: string, extensionsList: string[]): Promise<Array<{ title: string; path: string }>> {

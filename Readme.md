@@ -390,13 +390,13 @@ GameVault/
 * [x] macOS support
 * [x] Steam Deck optimized UI
 * [x] Portable Mode
-* [ ] Remote streaming launcher
-* [ ] Mobile companion application
+* [x] Remote streaming launcher
+* [x] Mobile companion application
 * [x] AI-powered game recommendations
 * [x] AI metadata enhancement
 * [x] AI library organization
-* [ ] Voice navigation
-* [ ] VR launcher mode
+* [x] Voice navigation
+* [x] VR launcher mode
 
 ---
 

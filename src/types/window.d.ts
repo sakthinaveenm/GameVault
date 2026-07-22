@@ -84,6 +84,10 @@ declare global {
       updatePortableMode: (enabled: boolean) => Promise<void>;
       updateDeckMode: (enabled: boolean) => Promise<void>;
 
+      // GameVault Future Vision Final
+      toggleStreamHost: (enabled: boolean) => Promise<void>;
+      recognizeVoiceCommand: () => Promise<string>;
+
       // Events
       onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => () => void;
     };

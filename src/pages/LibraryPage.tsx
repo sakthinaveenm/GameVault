@@ -278,6 +278,11 @@ export function LibraryPage({
 
   const [aiSuggestion, setAiSuggestion] = useState("Based on your play pattern of action-adventure games, we recommend launching Hades for a fast-paced rogue-like session.");
   const [isQueryingAi, setIsQueryingAi] = useState(false);
+  const [isListeningVoice, setIsListeningVoice] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  const [isStreamingHostActive, setIsStreamingHostActive] = useState(false);
+  const [streamToken, setStreamToken] = useState("gv-stream://kpost-deck-19a7c89f2a63d41e7");
+  const [vrModeEnabled, setVrModeEnabled] = useState(false);
 
   // Sync state with profile updates
   useEffect(() => {
@@ -1430,12 +1435,44 @@ export function LibraryPage({
                     <input
                       {...focusProps}
                       aria-label="Search games"
-                      className="w-full rounded-xl border border-white/10 bg-zinc-900 pl-10 pr-4 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+                      className="w-full rounded-xl border border-white/10 bg-zinc-900 pl-10 pr-10 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Search your library..."
                       value={query}
                     />
                     <Search className="absolute left-3.5 top-3.5 size-4 text-zinc-600" />
+                    
+                    <button
+                      onClick={async () => {
+                        if (isListeningVoice) return;
+                        setIsListeningVoice(true);
+                        setVoiceStatus("Listening... Say a game title!");
+                        sounds.playConfirm();
+                        try {
+                          const cmd = await window.gameVault.recognizeVoiceCommand();
+                          setVoiceStatus(`Recognized: "${cmd}"`);
+                          setQuery(cmd);
+                          await new Promise((resolve) => setTimeout(resolve, 800));
+                        } catch (err) {
+                          setVoiceStatus("Speech not recognized");
+                        } finally {
+                          setVoiceStatus(null);
+                          setIsListeningVoice(false);
+                        }
+                      }}
+                      className="absolute right-3.5 top-3.5 text-zinc-500 hover:text-[var(--accent)] transition"
+                      title="Search by Voice"
+                      type="button"
+                    >
+                      🎙️
+                    </button>
+
+                    {voiceStatus && (
+                      <div className="absolute z-10 top-12 left-0 right-0 bg-zinc-950 border border-white/10 rounded-xl p-3 text-xs text-zinc-300 shadow-xl animate-fade-in flex items-center gap-2">
+                        <span className="size-2 rounded-full bg-red-500 animate-ping" />
+                        <span>{voiceStatus}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Favorites Filter */}
@@ -1858,6 +1895,22 @@ export function LibraryPage({
                         className="accent-[var(--accent)] size-4 cursor-pointer"
                       />
                     </label>
+
+                    <label className="flex items-center justify-between gap-4 rounded-xl bg-zinc-950 p-4 cursor-pointer border border-white/5 hover:bg-zinc-900 transition mt-3">
+                      <div>
+                        <span className="text-sm font-semibold block">Virtual Reality (VR) Overlay</span>
+                        <span className="text-[10px] text-zinc-500">Inject simulated SteamVR panels during headset connection detection.</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={vrModeEnabled}
+                        onChange={(e) => {
+                          setVrModeEnabled(e.target.checked);
+                          sounds.playConfirm();
+                        }}
+                        className="accent-[var(--accent)] size-4 cursor-pointer"
+                      />
+                    </label>
                   </div>
 
                   {/* Library Backup & Restoration Card */}
@@ -1972,6 +2025,30 @@ export function LibraryPage({
                     >
                       Edit Profile Details
                     </button>
+                  </div>
+
+                  {/* Mobile Companion Connection Card */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4 text-center">
+                    <h3 className="text-lg font-bold flex items-center justify-center gap-2">
+                      <span>📱</span> Mobile Companion Link
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Link your library and track playtime stats on the go.
+                    </p>
+
+                    <div className="grid grid-cols-7 gap-1 size-24 border border-white/10 bg-white p-2 mx-auto rounded-2xl shadow-xl">
+                      {Array.from({ length: 49 }).map((_, i) => {
+                        const isDark = (i % 2 === 0 && i % 3 === 0) || (i < 7 && i !== 3 && i !== 4) || (i > 42 && i !== 45 && i !== 46) || (i % 7 === 0) || (i % 7 === 6);
+                        return (
+                          <div key={i} className={`rounded-sm ${isDark ? "bg-zinc-950" : "bg-transparent"}`} />
+                        );
+                      })}
+                    </div>
+
+                    <div className="bg-zinc-950 border border-white/5 rounded-xl py-2 px-3 inline-block">
+                      <span className="text-[10px] font-mono font-bold text-zinc-400">Linking Code: </span>
+                      <strong className="text-xs font-mono text-[var(--accent)] tracking-widest font-black">GV-9842</strong>
+                    </div>
                   </div>
 
                   {/* Library Folders widget */}
@@ -2537,6 +2614,60 @@ export function LibraryPage({
                         </button>
                       </div>
                     )}
+                  </div>
+
+                  {/* Remote Streaming Launcher Host */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Play className="size-5 text-[var(--accent)]" /> Remote Streaming Server
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Host your GameVault library catalog and stream gameplay sessions directly onto companion devices.
+                    </p>
+
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between bg-zinc-950 p-4 border border-white/5 rounded-2xl text-xs">
+                        <div>
+                          <span className="font-bold text-white block">Server Status</span>
+                          <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
+                            {isStreamingHostActive ? "Online (Ready to Stream)" : "Offline"}
+                          </span>
+                        </div>
+                        <span className={`size-3 rounded-full ${isStreamingHostActive ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+                      </div>
+
+                      {isStreamingHostActive && (
+                        <div className="bg-zinc-950/80 border border-white/5 rounded-2xl p-4 space-y-2 text-xs font-mono">
+                          <div className="flex justify-between">
+                            <span className="text-zinc-500">Host Port:</span>
+                            <span className="text-white">8082</span>
+                          </div>
+                          <div className="flex flex-col space-y-1">
+                            <span className="text-zinc-500">Access Token:</span>
+                            <span className="text-[10px] bg-zinc-900 px-2 py-1 rounded text-[var(--accent)] text-center break-all select-all">
+                              {streamToken}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={async () => {
+                          const target = !isStreamingHostActive;
+                          await window.gameVault.toggleStreamHost(target);
+                          setIsStreamingHostActive(target);
+                          sounds.playConfirm();
+                        }}
+                        className={`w-full rounded-xl py-2.5 text-xs font-black transition ${
+                          isStreamingHostActive
+                            ? "bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30"
+                            : "bg-[var(--accent)] text-zinc-950 hover:bg-[var(--accent-hover)]"
+                        }`}
+                        type="button"
+                      >
+                        {isStreamingHostActive ? "Shut Down Host Server" : "Launch Stream Host Server"}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Storage Manager & Disk Usage Analyzer */}
