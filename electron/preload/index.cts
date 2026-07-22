@@ -57,6 +57,14 @@ contextBridge.exposeInMainWorld("gameVault", {
   selectDirectory: () => ipcRenderer.invoke("library:select-directory"),
   scanConfiguredDirectory: (directory: string) => ipcRenderer.invoke("library:scan-configured", directory),
 
+  // Emulators & ROMs
+  getEmulators: () => ipcRenderer.invoke("emulators:get"),
+  addEmulator: (name: string, executablePath: string, platform: string, defaultArguments: string) =>
+    ipcRenderer.invoke("emulators:add", name, executablePath, platform, defaultArguments),
+  deleteEmulator: (id: number) => ipcRenderer.invoke("emulators:delete", id),
+  scanRoms: (emulatorId: number, folderPath: string, extensions: string) =>
+    ipcRenderer.invoke("emulators:scan-roms", emulatorId, folderPath, extensions),
+
   // Events
   onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => {
     const listener = (_event: any, data: any) => callback(data);

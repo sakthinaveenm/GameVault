@@ -56,6 +56,13 @@ const platformLabels: Record<string, string> = {
   steam: "Steam",
   epic: "Epic Games",
   gog: "GOG Galaxy",
+  ubisoft: "Ubisoft",
+  ea: "EA App",
+  xbox: "Xbox App",
+  battlenet: "Battle.net",
+  amazon: "Amazon Games",
+  itchio: "itch.io",
+  emulator: "ROM / Emulator",
   local: "Local"
 };
 
@@ -145,6 +152,34 @@ export function LibraryPage({
   // Undo/Redo settings history state
   const [settingsHistory, setSettingsHistory] = useState<Array<{ theme: string; accentColor: string; startInFullscreen: boolean }>>([]);
   const [historyPointer, setHistoryPointer] = useState(-1);
+
+  // Emulator & Roms management state
+  const [emulators, setEmulators] = useState<any[]>([]);
+  const [newEmuName, setNewEmuName] = useState("");
+  const [newEmuPath, setNewEmuPath] = useState("");
+  const [newEmuPlatform, setNewEmuPlatform] = useState("snes");
+  const [newEmuArgs, setNewEmuArgs] = useState('"[romPath]"');
+  const [scanEmuId, setScanEmuId] = useState<number | null>(null);
+  const [scanFolder, setScanFolder] = useState("");
+  const [scanExtensions, setScanExtensions] = useState(".sfc,.smc");
+
+  const refreshEmulators = useCallback(async () => {
+    try {
+      const list = await window.gameVault.getEmulators();
+      setEmulators(list);
+      if (list.length > 0 && scanEmuId === null) {
+        setScanEmuId(list[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to load emulators:", err);
+    }
+  }, [scanEmuId]);
+
+  useEffect(() => {
+    if (activeTab === "Settings") {
+      void refreshEmulators();
+    }
+  }, [activeTab, refreshEmulators]);
 
   // Advanced Filtering state
   const [playtimeFilter, setPlaytimeFilter] = useState<"all" | "short" | "medium" | "long">("all");
@@ -714,6 +749,13 @@ export function LibraryPage({
                   { id: "steam", name: "Steam Storefront", count: library.games.filter((g) => g.platform === "steam").length },
                   { id: "epic", name: "Epic Games", count: library.games.filter((g) => g.platform === "epic").length },
                   { id: "gog", name: "GOG Galaxy", count: library.games.filter((g) => g.platform === "gog").length },
+                  { id: "ubisoft", name: "Ubisoft Connect", count: library.games.filter((g) => g.platform === "ubisoft").length },
+                  { id: "ea", name: "EA App", count: library.games.filter((g) => g.platform === "ea").length },
+                  { id: "xbox", name: "Xbox App", count: library.games.filter((g) => g.platform === "xbox").length },
+                  { id: "battlenet", name: "Battle.net", count: library.games.filter((g) => g.platform === "battlenet").length },
+                  { id: "amazon", name: "Amazon Games", count: library.games.filter((g) => g.platform === "amazon").length },
+                  { id: "itchio", name: "itch.io", count: library.games.filter((g) => g.platform === "itchio").length },
+                  { id: "emulator", name: "ROMs / Emulated", count: library.games.filter((g) => g.platform === "emulator").length },
                   { id: "local", name: "Local Executables", count: library.games.filter((g) => g.platform === "local").length }
                 ].map((plat) => (
                   <li key={plat.id}>
@@ -1607,6 +1649,224 @@ export function LibraryPage({
                       )}
                     </div>
                   </div>
+
+                  {/* Emulator Profiles & ROMs Import Card */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-6">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <Clock className="size-5 text-[var(--accent)]" /> Emulators Manager
+                    </h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Add emulator paths, configure launch profiles, and import ROM collections.
+                    </p>
+
+                    {/* Add Emulator Profile form */}
+                    <div className="rounded-2xl bg-zinc-950 p-4 border border-white/5 space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Add Emulator Profile</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] text-zinc-500 font-semibold block mb-1">Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. RetroArch"
+                            value={newEmuName}
+                            onChange={(e) => setNewEmuName(e.target.value)}
+                            className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-zinc-500 font-semibold block mb-1">Console Platform</label>
+                          <select
+                            value={newEmuPlatform}
+                            onChange={(e) => {
+                              setNewEmuPlatform(e.target.value);
+                              if (e.target.value === "snes") {
+                                setNewEmuArgs('"[romPath]"');
+                                setScanExtensions(".sfc,.smc");
+                              } else if (e.target.value === "nes") {
+                                setNewEmuArgs('"[romPath]"');
+                                setScanExtensions(".nes");
+                              } else if (e.target.value === "n64") {
+                                setNewEmuArgs('"[romPath]"');
+                                setScanExtensions(".z64,.n64");
+                              } else if (e.target.value === "gameboy") {
+                                setNewEmuArgs('"[romPath]"');
+                                setScanExtensions(".gb,.gbc,.gba");
+                              }
+                            }}
+                            className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs text-white outline-none cursor-pointer"
+                          >
+                            <option value="snes">Super Nintendo (SNES)</option>
+                            <option value="nes">Nintendo (NES)</option>
+                            <option value="n64">Nintendo 64</option>
+                            <option value="gameboy">Game Boy / Color / Advance</option>
+                            <option value="other">Other Console</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-zinc-500 font-semibold block mb-1">Executable Path</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="/Applications/RetroArch.app or C:\Emulators\RetroArch.exe"
+                            value={newEmuPath}
+                            onChange={(e) => setNewEmuPath(e.target.value)}
+                            className="flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)] font-mono"
+                          />
+                          <button
+                            onClick={async () => {
+                              const path = await window.gameVault.selectDirectory();
+                              if (path) setNewEmuPath(path);
+                            }}
+                            className="rounded-lg bg-white/10 px-3 py-1 text-xs font-bold hover:bg-white/15 transition text-white"
+                            type="button"
+                          >
+                            Browse
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-zinc-500 font-semibold block mb-1">Default Arguments</label>
+                        <input
+                          type="text"
+                          placeholder='e.g. -f "[romPath]"'
+                          value={newEmuArgs}
+                          onChange={(e) => setNewEmuArgs(e.target.value)}
+                          className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)] font-mono"
+                        />
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          if (!newEmuName.trim() || !newEmuPath.trim()) {
+                            showToast("Please provide name and path.", "warning");
+                            return;
+                          }
+                          await window.gameVault.addEmulator(newEmuName.trim(), newEmuPath.trim(), newEmuPlatform, newEmuArgs);
+                          setNewEmuName("");
+                          setNewEmuPath("");
+                          await refreshEmulators();
+                          showToast("Emulator profile added", "success");
+                          sounds.playConfirm();
+                        }}
+                        className="w-full rounded-lg bg-[var(--accent)] py-2 text-xs font-black text-zinc-950 hover:bg-[var(--accent-hover)] transition"
+                        type="button"
+                      >
+                        Save Emulator
+                      </button>
+                    </div>
+
+                    {/* Installed Emulators List */}
+                    {emulators.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Configured Emulators</h4>
+                        <div className="space-y-2">
+                          {emulators.map((emu) => (
+                            <div key={emu.id} className="flex items-center justify-between gap-4 rounded-xl bg-zinc-950 p-3 border border-white/5 font-mono">
+                              <div>
+                                <span className="text-xs font-bold block text-white font-sans">{emu.name} ({emu.platform.toUpperCase()})</span>
+                                <span className="text-[9px] text-zinc-500 block truncate max-w-xs">{emu.executablePath}</span>
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  await window.gameVault.deleteEmulator(emu.id);
+                                  await refreshEmulators();
+                                  await refreshLibrary();
+                                  showToast("Emulator profile removed", "warning");
+                                  sounds.playConfirm();
+                                }}
+                                className="rounded-lg bg-red-950/40 border border-red-500/20 px-3 py-1 text-xs font-bold text-red-200 hover:bg-red-950 transition font-sans"
+                                type="button"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ROMs Scanner Section */}
+                    {emulators.length > 0 && (
+                      <div className="rounded-2xl bg-zinc-950 p-4 border border-white/5 space-y-3">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Scan Rom Folder</h4>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] text-zinc-500 font-semibold block mb-1">Target Emulator</label>
+                            <select
+                              value={scanEmuId || ""}
+                              onChange={(e) => setScanEmuId(Number(e.target.value))}
+                              className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs text-white outline-none cursor-pointer"
+                            >
+                              {emulators.map((emu) => (
+                                <option key={emu.id} value={emu.id}>{emu.name} ({emu.platform.toUpperCase()})</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-zinc-500 font-semibold block mb-1">File Extensions (comma separated)</label>
+                            <input
+                              type="text"
+                              value={scanExtensions}
+                              onChange={(e) => setScanExtensions(e.target.value)}
+                              className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)] font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-zinc-500 font-semibold block mb-1">ROMs Folder Directory</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="No folder selected"
+                              readOnly
+                              value={scanFolder}
+                              className="flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 outline-none truncate font-mono"
+                            />
+                            <button
+                              onClick={async () => {
+                                const folder = await window.gameVault.selectDirectory();
+                                if (folder) setScanFolder(folder);
+                              }}
+                              className="rounded-lg bg-white/10 px-3 py-1 text-xs font-bold hover:bg-white/15 transition text-white"
+                              type="button"
+                            >
+                              Browse
+                            </button>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={async () => {
+                            if (!scanEmuId || !scanFolder || !scanExtensions) {
+                              showToast("Please specify emulator and folder directory.", "warning");
+                              return;
+                            }
+                            setIsImporting(true);
+                            try {
+                              const res = await window.gameVault.scanRoms(scanEmuId, scanFolder, scanExtensions);
+                              await refreshLibrary();
+                              showToast(`Imported ${res.count} ROMs successfully`, "success");
+                              sounds.playConfirm();
+                            } catch (err: any) {
+                              showToast(`Error scanning: ${err.message || err}`, "warning");
+                            } finally {
+                              setIsImporting(false);
+                            }
+                          }}
+                          disabled={isImporting}
+                          className="w-full rounded-lg bg-[var(--accent)] py-2 text-xs font-black text-zinc-950 hover:bg-[var(--accent-hover)] transition disabled:opacity-50"
+                          type="button"
+                        >
+                          {isImporting ? "Scanning folder..." : "Trigger ROMs Scan"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1856,6 +2116,13 @@ export function LibraryPage({
                   <option value="steam">Steam</option>
                   <option value="epic">Epic Games</option>
                   <option value="gog">GOG Galaxy</option>
+                  <option value="ubisoft">Ubisoft Connect</option>
+                  <option value="ea">EA App</option>
+                  <option value="xbox">Xbox App</option>
+                  <option value="battlenet">Battle.net</option>
+                  <option value="amazon">Amazon Games</option>
+                  <option value="itchio">itch.io</option>
+                  <option value="emulator">ROMs / Emulated</option>
                   <option value="local">Local</option>
                 </select>
               </div>

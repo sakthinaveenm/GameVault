@@ -52,6 +52,12 @@ declare global {
       selectDirectory: () => Promise<string | null>;
       scanConfiguredDirectory: (directory: string) => Promise<{ count: number }>;
 
+      // Emulators & ROMs
+      getEmulators: () => Promise<Emulator[]>;
+      addEmulator: (name: string, executablePath: string, platform: string, defaultArguments: string) => Promise<number>;
+      deleteEmulator: (id: number) => Promise<void>;
+      scanRoms: (emulatorId: number, folderPath: string, extensions: string) => Promise<{ count: number }>;
+
       // Events
       onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => () => void;
     };
@@ -91,5 +97,13 @@ export type Profile = {
   customAccent?: string;
 };
 
-export type Collection = { id: number; name: string; gameCount: number };
+export type Collection = { id: number; name: string; gameCount: number; rules?: string | null };
 export type LibraryState = { games: Game[]; collections: Collection[] };
+
+export type Emulator = {
+  id: number;
+  name: string;
+  executablePath: string;
+  platform: string;
+  defaultArguments: string;
+};

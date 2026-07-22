@@ -283,20 +283,20 @@ GameVault/
 
 ### Platform Support
 
-* [ ] Ubisoft Connect improvements
-* [ ] EA App improvements
-* [ ] Xbox App improvements
-* [ ] Battle.net improvements
-* [ ] Amazon Games support
-* [ ] itch.io support
+* [x] Ubisoft Connect improvements
+* [x] EA App improvements
+* [x] Xbox App improvements
+* [x] Battle.net improvements
+* [x] Amazon Games support
+* [x] itch.io support
 
 ### Emulator Improvements
 
-* [ ] Emulator auto detection
-* [ ] ROM scanning
-* [ ] BIOS management
-* [ ] Multiple emulator profiles
-* [ ] Emulator launch arguments
+* [x] Emulator auto detection
+* [x] ROM scanning
+* [x] BIOS management
+* [x] Multiple emulator profiles
+* [x] Emulator launch arguments
 
 ---
 

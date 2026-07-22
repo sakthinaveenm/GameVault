@@ -1,9 +1,22 @@
 import { dialog, ipcMain, app } from "electron";
 import path from "node:path";
+import { readdir } from "node:fs/promises";
 import type { Database } from "../database/database.js";
 import { scanForGames } from "../services/game-scanner.js";
 import { launchGame } from "../launcher/launcher.js";
-import { scanSteamGames, scanEpicGames, scanGogGames, getMockPlatformGames, fetchFullMetadataForGame } from "../services/platform-scanner.js";
+import {
+  scanSteamGames,
+  scanEpicGames,
+  scanGogGames,
+  getMockPlatformGames,
+  fetchFullMetadataForGame,
+  scanUbisoftGames,
+  scanEaGames,
+  scanXboxGames,
+  scanBattlenetGames,
+  scanAmazonGames,
+  scanItchioGames
+} from "../services/platform-scanner.js";
 
 export function registerAppIpc(database: Database): void {
   ipcMain.handle("app:get-info", () => ({
@@ -158,8 +171,24 @@ export function registerAppIpc(database: Database): void {
     const steamGames = await scanSteamGames(profile.steamDirectory);
     const epicGames = await scanEpicGames();
     const gogGames = await scanGogGames();
+    const ubiGames = await scanUbisoftGames();
+    const eaGames = await scanEaGames();
+    const xboxGames = await scanXboxGames();
+    const bnetGames = await scanBattlenetGames();
+    const amzGames = await scanAmazonGames();
+    const itchGames = await scanItchioGames();
 
-    const allGames = [...steamGames, ...epicGames, ...gogGames];
+    const allGames = [
+      ...steamGames,
+      ...epicGames,
+      ...gogGames,
+      ...ubiGames,
+      ...eaGames,
+      ...xboxGames,
+      ...bnetGames,
+      ...amzGames,
+      ...itchGames
+    ];
     let imported = 0;
     if (allGames.length > 0) {
       imported = database.importPlatformGames(allGames);
@@ -324,4 +353,69 @@ export function registerAppIpc(database: Database): void {
       return false;
     }
   });
+
+  // Emulators & ROMs Handlers
+  ipcMain.handle("emulators:get", () => {
+    return database.getEmulators();
+  });
+
+  ipcMain.handle("emulators:add", (_event, name: unknown, executablePath: unknown, platform: unknown, defaultArguments: unknown) => {
+    if (typeof name !== "string" || typeof executablePath !== "string" || typeof platform !== "string" || typeof defaultArguments !== "string") {
+      throw new Error("Invalid emulator details.");
+    }
+    return database.addEmulator(name, executablePath, platform, defaultArguments);
+  });
+
+  ipcMain.handle("emulators:delete", (_event, id: unknown) => {
+    if (typeof id !== "number") throw new Error("Invalid emulator ID.");
+    database.deleteEmulator(id);
+    return true;
+  });
+
+  ipcMain.handle("emulators:scan-roms", async (_event, emulatorId: unknown, folderPath: unknown, extensions: unknown) => {
+    if (typeof emulatorId !== "number" || typeof folderPath !== "string" || typeof extensions !== "string") {
+      throw new Error("Invalid scan parameters.");
+    }
+    const extList = extensions.split(",").map((x) => x.trim().toLowerCase());
+    const discovered = await scanForRoms(folderPath, extList);
+
+    let count = 0;
+    for (const rom of discovered) {
+      const exists = database.getGames().some((g) => g.executablePath === rom.path && g.platform === "emulator");
+      if (!exists) {
+        database.addGame(rom.title, rom.path, "emulator", { platformGameId: String(emulatorId) });
+        count++;
+      }
+    }
+    return { count };
+  });
+}
+
+async function scanForRoms(directory: string, extensionsList: string[]): Promise<Array<{ title: string; path: string }>> {
+  const roms: Array<{ title: string; path: string }> = [];
+  
+  async function walk(dir: string) {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!entry.name.startsWith(".") && entry.name !== "node_modules") {
+            await walk(fullPath);
+          }
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name).toLowerCase();
+          if (extensionsList.includes(ext)) {
+            const title = path.basename(entry.name, ext).replace(/[._-]+/g, " ").trim();
+            roms.push({ title, path: fullPath });
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`Error scanning rom directory ${dir}:`, err);
+    }
+  }
+
+  await walk(directory);
+  return roms;
 }

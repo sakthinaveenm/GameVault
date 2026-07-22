@@ -246,6 +246,13 @@ export async function scanGogGames(): Promise<ScannedPlatformGame[]> {
   return [];
 }
 
+export async function scanUbisoftGames(): Promise<ScannedPlatformGame[]> { return []; }
+export async function scanEaGames(): Promise<ScannedPlatformGame[]> { return []; }
+export async function scanXboxGames(): Promise<ScannedPlatformGame[]> { return []; }
+export async function scanBattlenetGames(): Promise<ScannedPlatformGame[]> { return []; }
+export async function scanAmazonGames(): Promise<ScannedPlatformGame[]> { return []; }
+export async function scanItchioGames(): Promise<ScannedPlatformGame[]> { return []; }
+
 // Highly polished Mock games for Demo/Sandbox platforms mode
 export function getMockPlatformGames(): ScannedPlatformGame[] {
   return [
@@ -275,9 +282,9 @@ export function getMockPlatformGames(): ScannedPlatformGame[] {
     },
     {
       title: "Celeste",
-      executablePath: "com.epicgames.launcher://apps/Candy?action=launch&silent=true",
-      platform: "epic",
-      platformGameId: "Candy",
+      executablePath: "itch://apps/Celeste",
+      platform: "itchio",
+      platformGameId: "Celeste",
       developer: "Extremely OK Games",
       publisher: "Extremely OK Games",
       genres: "Platformer, Indie, Hardcore",
@@ -296,6 +303,66 @@ export function getMockPlatformGames(): ScannedPlatformGame[] {
       releaseDate: "May 18, 2015",
       description: "You are Geralt of Rivia, mercenary monster slayer. Before you stands a war-torn, monster-infested continent you can explore at will. Track down the Child of Prophecy, a living weapon that can alter the shape of the world.",
       coverPath: "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/292030/library_600x900.jpg",
+    },
+    {
+      title: "Assassin's Creed Valhalla",
+      executablePath: "uplay://launch/13504/0",
+      platform: "ubisoft",
+      platformGameId: "13504",
+      developer: "Ubisoft Montreal",
+      publisher: "Ubisoft",
+      genres: "Action, RPG, Open World",
+      releaseDate: "Nov 10, 2020",
+      description: "Become Eivor, a legendary Viking warrior raised on tales of battle and glory. Explore England's Dark Ages as you raid your enemies, grow your settlement, and build your political power.",
+      coverPath: "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/2208920/library_600x900.jpg",
+    },
+    {
+      title: "Battlefield 2042",
+      executablePath: "origin://launchgame/195155",
+      platform: "ea",
+      platformGameId: "195155",
+      developer: "DICE",
+      publisher: "Electronic Arts",
+      genres: "Action, Shooter, Multiplayer",
+      releaseDate: "Nov 19, 2021",
+      description: "Battlefield™ 2042 is a first-person shooter that marks the return to the iconic all-out warfare of the franchise. Adapt and overcome in a near-future world transformed by disorder.",
+      coverPath: "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1517290/library_600x900.jpg",
+    },
+    {
+      title: "Halo Infinite",
+      executablePath: "xbox://launch/HaloInfinite",
+      platform: "xbox",
+      platformGameId: "HaloInfinite",
+      developer: "343 Industries",
+      publisher: "Xbox Game Studios",
+      genres: "Action, Shooter, Sci-Fi",
+      releaseDate: "Dec 8, 2021",
+      description: "When all hope is lost and humanity’s fate hangs in the balance, the Master Chief is ready to confront the most ruthless foe he’s ever faced. Step inside the armor of humanity’s greatest hero.",
+      coverPath: "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1240440/library_600x900.jpg",
+    },
+    {
+      title: "Diablo IV",
+      executablePath: "battlenet://Play/Fen",
+      platform: "battlenet",
+      platformGameId: "Fen",
+      developer: "Blizzard Entertainment",
+      publisher: "Blizzard Entertainment",
+      genres: "Action, RPG, Hack & Slash",
+      releaseDate: "Jun 5, 2023",
+      description: "The endless battle between the High Heavens and the Burning Hells rages on as chaos threatens to consume Sanctuary. Defeat Lilith and unlock powerful gear in the ultimate action RPG.",
+      coverPath: "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/2344520/library_600x900.jpg",
+    },
+    {
+      title: "Lost Ark",
+      executablePath: "amazon-games://play/LostArk",
+      platform: "amazon",
+      platformGameId: "LostArk",
+      developer: "Smilegate RPG",
+      publisher: "Amazon Games",
+      genres: "Action, RPG, MMORPG",
+      releaseDate: "Feb 11, 2022",
+      description: "Embark on an odyssey for the Lost Ark in a vast, vibrant world: explore new lands, seek out lost treasures, and test yourself in thrilling action combat.",
+      coverPath: "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1599340/library_600x900.jpg",
     }
   ];
 }

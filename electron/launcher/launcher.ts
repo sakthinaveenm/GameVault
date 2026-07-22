@@ -29,7 +29,78 @@ export function launchGame(database: Database, gameId: number): void {
 
   const startTime = Date.now();
 
-  if (game.platform === "local") {
+  if (game.platform === "emulator") {
+    const emulatorId = Number(game.platformGameId);
+    const emulators = database.getEmulators();
+    const emulator = emulators.find((e) => e.id === emulatorId);
+    if (!emulator) {
+      throw new Error(`Emulator with ID ${emulatorId} not found.`);
+    }
+
+    const args: string[] = [];
+
+    // Parse emulator default arguments (with [romPath] replacement)
+    if (emulator.defaultArguments) {
+      const regex = /"([^"]*)"|'([^']*)'|(\S+)/g;
+      let matches;
+      while ((matches = regex.exec(emulator.defaultArguments)) !== null) {
+        let arg = matches[1] || matches[2] || matches[3];
+        if (arg.includes("[romPath]")) {
+          arg = arg.replace("[romPath]", game.executablePath);
+        }
+        args.push(arg);
+      }
+    }
+
+    // Append ROM path if not already tokenized
+    const hasRomPathToken = emulator.defaultArguments && emulator.defaultArguments.includes("[romPath]");
+    if (!hasRomPathToken) {
+      args.push(game.executablePath);
+    }
+
+    // Parse custom game launch arguments
+    if (game.launchArguments) {
+      const regex = /"([^"]*)"|'([^']*)'|(\S+)/g;
+      let matches;
+      while ((matches = regex.exec(game.launchArguments)) !== null) {
+        args.push(matches[1] || matches[2] || matches[3]);
+      }
+    }
+
+    const child = spawn(emulator.executablePath, args, {
+      detached: true,
+      stdio: "ignore",
+    });
+
+    activeSession = {
+      gameId,
+      startTime,
+      process: child,
+    };
+
+    sendGameStatus(gameId, "started");
+
+    const onExit = () => {
+      if (activeSession && activeSession.gameId === gameId) {
+        const durationSeconds = Math.round((Date.now() - startTime) / 1000);
+        if (durationSeconds > 0) {
+          database.incrementPlaytime(gameId, durationSeconds);
+          database.recordLaunchSession(gameId, durationSeconds);
+        }
+        activeSession = null;
+        sendGameStatus(gameId, "stopped", durationSeconds);
+      }
+    };
+
+    child.on("exit", onExit);
+    child.on("error", (err) => {
+      console.error("Failed to launch emulator process:", err);
+      if (activeSession && activeSession.gameId === gameId) {
+        activeSession = null;
+        sendGameStatus(gameId, "error");
+      }
+    });
+  } else if (game.platform === "local") {
     const isMacApp = process.platform === "darwin" && game.executablePath.endsWith(".app");
     
     // Parse launch arguments

@@ -168,6 +168,19 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_games_playtime ON games(playtime_seconds);
     `,
   },
+  {
+    version: 11,
+    name: "add_v1_3_emulators_table",
+    up: `
+      CREATE TABLE IF NOT EXISTS emulators (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        executable_path TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        default_arguments TEXT
+      );
+    `,
+  },
 ] as const;
 
 export class Database {
@@ -438,14 +451,15 @@ export class Database {
       genres?: string | null;
       releaseDate?: string | null;
       launchArguments?: string | null;
+      platformGameId?: string | null;
     } = {}
   ): number {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) throw new Error("Game title is required.");
 
     const result = this.connection.prepare(`
-      INSERT INTO games (title, executable_path, platform, description, cover_path, developer, publisher, genres, release_date, launch_arguments)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO games (title, executable_path, platform, description, cover_path, developer, publisher, genres, release_date, launch_arguments, platform_game_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       trimmedTitle,
       executablePath,
@@ -456,7 +470,8 @@ export class Database {
       metadata.publisher || null,
       metadata.genres || null,
       metadata.releaseDate || null,
-      metadata.launchArguments || null
+      metadata.launchArguments || null,
+      metadata.platformGameId || null
     );
 
     return Number(result.lastInsertRowid);
@@ -568,6 +583,36 @@ export class Database {
   getCollectionGames(collectionId: number): number[] {
     const rows = this.connection.prepare("SELECT game_id FROM collection_games WHERE collection_id = ?").all(collectionId) as Array<{ game_id: number }>;
     return rows.map((r) => r.game_id);
+  }
+
+  addEmulator(name: string, executablePath: string, platform: string, defaultArguments: string): number {
+    const result = this.connection.prepare(`
+      INSERT INTO emulators (name, executable_path, platform, default_arguments)
+      VALUES (?, ?, ?, ?)
+    `).run(name, executablePath, platform, defaultArguments);
+    return Number(result.lastInsertRowid);
+  }
+
+  deleteEmulator(emulatorId: number): void {
+    this.connection.prepare("DELETE FROM emulators WHERE id = ?").run(emulatorId);
+    this.connection.prepare("DELETE FROM games WHERE platform = 'emulator' AND platform_game_id = ?").run(String(emulatorId));
+  }
+
+  getEmulators(): Array<{ id: number; name: string; executablePath: string; platform: string; defaultArguments: string }> {
+    const rows = this.connection.prepare("SELECT id, name, executable_path, platform, default_arguments FROM emulators").all() as Array<{
+      id: number;
+      name: string;
+      executable_path: string;
+      platform: string;
+      default_arguments: string;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      executablePath: row.executable_path,
+      platform: row.platform,
+      defaultArguments: row.default_arguments,
+    }));
   }
 
   private runMigrations(): void {
