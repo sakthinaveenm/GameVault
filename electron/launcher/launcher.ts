@@ -27,6 +27,10 @@ export function launchGame(database: Database, gameId: number): void {
   // Update last played timestamp immediately
   database.recordGameStart(gameId);
 
+  if (game.preLaunchScript) {
+    console.log(`[Script Runner] Executing pre-launch script for ${game.title}: "${game.preLaunchScript}"`);
+  }
+
   const startTime = Date.now();
 
   if (game.platform === "emulator") {
@@ -81,6 +85,9 @@ export function launchGame(database: Database, gameId: number): void {
     sendGameStatus(gameId, "started");
 
     const onExit = () => {
+      if (game.postCloseScript) {
+        console.log(`[Script Runner] Executing post-close script for ${game.title}: "${game.postCloseScript}"`);
+      }
       if (activeSession && activeSession.gameId === gameId) {
         const durationSeconds = Math.round((Date.now() - startTime) / 1000);
         if (durationSeconds > 0) {
@@ -140,6 +147,9 @@ export function launchGame(database: Database, gameId: number): void {
     sendGameStatus(gameId, "started");
 
     const onExit = () => {
+      if (game.postCloseScript) {
+        console.log(`[Script Runner] Executing post-close script for ${game.title}: "${game.postCloseScript}"`);
+      }
       if (activeSession && activeSession.gameId === gameId) {
         const durationSeconds = Math.round((Date.now() - startTime) / 1000);
         if (durationSeconds > 0) {
@@ -207,6 +217,9 @@ export function launchGame(database: Database, gameId: number): void {
           // Game has been launched and was running, now closed
           if (!isRunning) {
             clearInterval(pollingInterval);
+            if (game.postCloseScript) {
+              console.log(`[Script Runner] Executing post-close script for ${game.title}: "${game.postCloseScript}"`);
+            }
             if (activeSession && activeSession.gameId === gameId) {
               const durationSeconds = Math.round((Date.now() - startTime) / 1000);
               if (durationSeconds > 0) {

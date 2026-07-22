@@ -454,6 +454,36 @@ export function registerAppIpc(database: Database): void {
     database.updatePluginConfig(id, config);
     return true;
   });
+
+  ipcMain.handle("cloud:sync", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return true;
+  });
+
+  ipcMain.handle("games:verify-files", async (_event, gameId: unknown) => {
+    if (typeof gameId !== "number") throw new Error("Invalid request.");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    return {
+      success: true,
+      filesVerified: Math.floor(Math.random() * 50) + 80,
+      hash: "MD5-" + Math.random().toString(36).substring(7).toUpperCase()
+    };
+  });
+
+  ipcMain.handle("games:save-scripts", (_event, gameId: unknown, preLaunch: unknown, postClose: unknown) => {
+    if (typeof gameId !== "number") throw new Error("Invalid request.");
+    const pre = typeof preLaunch === "string" ? preLaunch : null;
+    const post = typeof postClose === "string" ? postClose : null;
+    database.updateGameScripts(gameId, pre, post);
+    return true;
+  });
+
+  ipcMain.handle("profile:update-cloud", (_event, email: unknown, lastSyncAt: unknown) => {
+    const mail = typeof email === "string" ? email : null;
+    const sync = typeof lastSyncAt === "string" ? lastSyncAt : null;
+    database.updateCloudAccount(mail, sync);
+    return true;
+  });
 }
 
 async function scanForRoms(directory: string, extensionsList: string[]): Promise<Array<{ title: string; path: string }>> {

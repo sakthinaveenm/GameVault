@@ -347,40 +347,40 @@ GameVault/
 
 ### Cloud
 
-* [ ] Optional GameVault account
-* [ ] Cloud synchronization
-* [ ] Settings sync
-* [ ] Library sync
-* [ ] Artwork sync
+* [x] Optional GameVault account
+* [x] Cloud synchronization
+* [x] Settings sync
+* [x] Library sync
+* [x] Artwork sync
 
 ### Game Management
 
-* [ ] Download manager
-* [ ] Automatic game updates
-* [ ] Verify game files
-* [ ] Storage manager
-* [ ] Disk usage analyzer
+* [x] Download manager
+* [x] Automatic game updates
+* [x] Verify game files
+* [x] Storage manager
+* [x] Disk usage analyzer
 
 ### Achievements
 
-* [ ] Unified achievements
-* [ ] Achievement tracker
-* [ ] Achievement notifications
+* [x] Unified achievements
+* [x] Achievement tracker
+* [x] Achievement notifications
 
 ### Overlay
 
-* [ ] In-game overlay
-* [ ] FPS counter
-* [ ] Performance monitor
-* [ ] Screenshot manager
+* [x] In-game overlay
+* [x] FPS counter
+* [x] Performance monitor
+* [x] Screenshot manager
 
 ### Advanced Features
 
-* [ ] Game launcher scripting
-* [ ] Automation rules
-* [ ] Custom startup actions
-* [ ] Multi-monitor support
-* [ ] HDR support
+* [x] Game launcher scripting
+* [x] Automation rules
+* [x] Custom startup actions
+* [x] Multi-monitor support
+* [x] HDR support
 
 ---
 

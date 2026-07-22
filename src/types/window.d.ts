@@ -72,6 +72,12 @@ declare global {
       setPluginEnabled: (id: string, enabled: boolean) => Promise<void>;
       updatePluginConfig: (id: string, config: string) => Promise<void>;
 
+      // GameVault Hub v2.0
+      cloudSync: () => Promise<void>;
+      verifyGameFiles: (gameId: number) => Promise<{ success: boolean; filesVerified: number; hash: string }>;
+      saveGameScripts: (gameId: number, preLaunch: string | null, postClose: string | null) => Promise<void>;
+      updateCloudAccount: (email: string | null, lastSyncAt: string | null) => Promise<void>;
+
       // Events
       onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => () => void;
     };
@@ -96,6 +102,9 @@ export type Game = {
   platformGameId?: string | null;
   isCompleted: boolean;
   showcased: boolean;
+  gameSizeBytes: number;
+  preLaunchScript: string | null;
+  postCloseScript: string | null;
 };
 
 export type Profile = {
@@ -111,6 +120,8 @@ export type Profile = {
   customBgSecondary?: string;
   customTextPrimary?: string;
   customAccent?: string;
+  cloudEmail: string | null;
+  lastSyncAt: string | null;
 };
 
 export type Collection = { id: number; name: string; gameCount: number; rules?: string | null };

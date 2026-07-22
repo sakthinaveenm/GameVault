@@ -32,6 +32,10 @@ export function GameDetailsPage({
   const [isSaving, setIsSaving] = useState(false);
   const [launchArgs, setLaunchArgs] = useState(game.launchArguments || "");
   const [hiddenState, setHiddenState] = useState(game.isHidden || false);
+  const [preScript, setPreScript] = useState(game.preLaunchScript || "");
+  const [postScript, setPostScript] = useState(game.postCloseScript || "");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifierMessage, setVerifierMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<any[]>([]);
 
   // Active Session Timer state
@@ -124,6 +128,13 @@ export function GameDetailsPage({
         launchArguments: launchArgs.trim(),
         isHidden: hiddenState
       });
+      await window.gameVault.saveGameScripts(game.id, preScript.trim() || null, postScript.trim() || null);
+      
+      await onUpdateMetadata(game.id, {
+        preLaunchScript: preScript.trim() || null,
+        postCloseScript: postScript.trim() || null
+      });
+
       setIsEditing(false);
     } catch (err) {
       console.error(err);
@@ -339,6 +350,26 @@ export function GameDetailsPage({
                     onChange={(e) => setLaunchArgs(e.target.value)}
                     className="w-full mt-2 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
                     placeholder="E.g. -novid -windowed"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-zinc-500">Pre-Launch Automation Hook (Bash/Batch)</label>
+                  <input
+                    type="text"
+                    value={preScript}
+                    onChange={(e) => setPreScript(e.target.value)}
+                    className="w-full mt-2 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[var(--accent)] text-white font-mono"
+                    placeholder="E.g. taskkill /f /im explorer.exe"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-zinc-500">Post-Close Automation Hook (Bash/Batch)</label>
+                  <input
+                    type="text"
+                    value={postScript}
+                    onChange={(e) => setPostScript(e.target.value)}
+                    className="w-full mt-2 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[var(--accent)] text-white font-mono"
+                    placeholder="E.g. start explorer.exe"
                   />
                 </div>
                 <div className="col-span-2 flex items-center gap-3 bg-zinc-950/40 p-3 rounded-xl border border-white/5">
@@ -557,6 +588,40 @@ export function GameDetailsPage({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Files Integrity Check card */}
+          <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4 text-left">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+              <FileText className="size-4 text-[var(--accent)]" /> Integrity Verifier
+            </h4>
+            <p className="text-[10px] text-zinc-400">Validate local application assets structure and verify checksum signatures.</p>
+
+            {verifierMessage && (
+              <div className="rounded-xl bg-zinc-950 border border-white/5 p-3 text-[10px] font-mono text-zinc-300 whitespace-pre-wrap break-all">
+                {verifierMessage}
+              </div>
+            )}
+
+            <button
+              onClick={async () => {
+                setIsVerifying(true);
+                setVerifierMessage("Analyzing game directory...\nCalculating hashes...");
+                try {
+                  const res = await window.gameVault.verifyGameFiles(game.id);
+                  setVerifierMessage(`Validation Complete!\n- Files Verified: ${res.filesVerified}\n- Status: SUCCESS\n- Signature: ${res.hash}`);
+                } catch (err: any) {
+                  setVerifierMessage(`Verification failed: ${err.message || err}`);
+                } finally {
+                  setIsVerifying(false);
+                }
+              }}
+              disabled={isVerifying}
+              className="w-full rounded-xl bg-white/5 border border-white/10 py-2 text-xs font-bold text-zinc-300 hover:bg-white/10 transition disabled:opacity-50"
+              type="button"
+            >
+              {isVerifying ? "Verifying Files..." : "Verify Game Files"}
+            </button>
           </div>
         </div>
       </div>

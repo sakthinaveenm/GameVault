@@ -80,6 +80,14 @@ contextBridge.exposeInMainWorld("gameVault", {
   setPluginEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke("plugins:toggle", id, enabled),
   updatePluginConfig: (id: string, config: string) => ipcRenderer.invoke("plugins:configure", id, config),
 
+  // GameVault Hub v2.0
+  cloudSync: () => ipcRenderer.invoke("cloud:sync"),
+  verifyGameFiles: (gameId: number) => ipcRenderer.invoke("games:verify-files", gameId),
+  saveGameScripts: (gameId: number, preLaunch: string | null, postClose: string | null) =>
+    ipcRenderer.invoke("games:save-scripts", gameId, preLaunch, postClose),
+  updateCloudAccount: (email: string | null, lastSyncAt: string | null) =>
+    ipcRenderer.invoke("profile:update-cloud", email, lastSyncAt),
+
   // Events
   onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => {
     const listener = (_event: any, data: any) => callback(data);

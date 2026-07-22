@@ -19,6 +19,11 @@ export type Game = {
   platformGameId?: string | null;
   launchArguments?: string | null;
   isHidden?: boolean;
+  isCompleted?: boolean;
+  showcased?: boolean;
+  gameSizeBytes?: number;
+  preLaunchScript?: string | null;
+  postCloseScript?: string | null;
 };
 
 export type Profile = {
@@ -34,6 +39,8 @@ export type Profile = {
   customBgSecondary?: string;
   customTextPrimary?: string;
   customAccent?: string;
+  cloudEmail?: string | null;
+  lastSyncAt?: string | null;
 };
 
 export type GameImport = Pick<Game, "title" | "executablePath">;
@@ -221,6 +228,17 @@ const migrations = [
         ('cyberpunk-neon', 'Cyberpunk Neon Theme', 'Injects a dynamic dark neon cyberpunk green/pink color palette to GameVault.', 'NeoStyles', '1.2.0', 'theme', 0, '{"primary":"#050508","secondary":"#0f0a1c","accent":"#ff0055","accentHover":"#ff3377","text":"#00ffcc"}', '');
     `,
   },
+  {
+    version: 14,
+    name: "add_v2_0_gamevault_hub",
+    up: `
+      ALTER TABLE games ADD COLUMN game_size_bytes INTEGER NOT NULL DEFAULT 15000000000;
+      ALTER TABLE games ADD COLUMN pre_launch_script TEXT;
+      ALTER TABLE games ADD COLUMN post_close_script TEXT;
+      ALTER TABLE profiles ADD COLUMN cloud_email TEXT;
+      ALTER TABLE profiles ADD COLUMN last_sync_at TEXT;
+    `,
+  },
 ] as const;
 
 export class Database {
@@ -271,7 +289,7 @@ export class Database {
 
   getGames(): Game[] {
     const rows = this.connection.prepare(`
-      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite, description, cover_path, developer, publisher, genres, release_date, platform, platform_game_id, launch_arguments, is_hidden, is_completed, showcased
+      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite, description, cover_path, developer, publisher, genres, release_date, platform, platform_game_id, launch_arguments, is_hidden, is_completed, showcased, game_size_bytes, pre_launch_script, post_close_script
       FROM games
       ORDER BY title COLLATE NOCASE ASC
     `).all() as Array<{
@@ -294,6 +312,9 @@ export class Database {
       is_hidden: number;
       is_completed: number;
       showcased: number;
+      game_size_bytes: number;
+      pre_launch_script: string | null;
+      post_close_script: string | null;
     }>;
 
     return rows.map((game) => ({
@@ -316,6 +337,9 @@ export class Database {
       isHidden: game.is_hidden === 1,
       isCompleted: game.is_completed === 1,
       showcased: game.showcased === 1,
+      gameSizeBytes: game.game_size_bytes,
+      preLaunchScript: game.pre_launch_script,
+      postCloseScript: game.post_close_script,
     }));
   }
 
@@ -419,6 +443,8 @@ export class Database {
       custom_bg_secondary: string;
       custom_text_primary: string;
       custom_accent: string;
+      cloud_email: string | null;
+      last_sync_at: string | null;
     };
     return {
       id: row.id,
@@ -433,6 +459,8 @@ export class Database {
       customBgSecondary: row.custom_bg_secondary,
       customTextPrimary: row.custom_text_primary,
       customAccent: row.custom_accent,
+      cloudEmail: row.cloud_email,
+      lastSyncAt: row.last_sync_at,
     };
   }
 
@@ -802,6 +830,14 @@ export class Database {
 
   updatePluginConfig(id: string, config: string): void {
     this.connection.prepare("UPDATE plugins SET config = ? WHERE id = ?").run(config, id);
+  }
+
+  updateCloudAccount(email: string | null, lastSyncAt: string | null): void {
+    this.connection.prepare("UPDATE profiles SET cloud_email = ?, last_sync_at = ? WHERE id = 1").run(email, lastSyncAt);
+  }
+
+  updateGameScripts(gameId: number, preLaunch: string | null, postClose: string | null): void {
+    this.connection.prepare("UPDATE games SET pre_launch_script = ?, post_close_script = ? WHERE id = ?").run(preLaunch, postClose, gameId);
   }
 
   private runMigrations(): void {

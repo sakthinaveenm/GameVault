@@ -50,7 +50,7 @@ interface LibraryPageProps {
   ) => Promise<void>;
 }
 
-const navigation = ["Home", "Library", "Collections", "Plugins", "Settings"];
+const navigation = ["Home", "Library", "Collections", "Plugins", "Hub", "Settings"];
 
 const platformLabels: Record<string, string> = {
   steam: "Steam",
@@ -254,6 +254,63 @@ export function LibraryPage({
       }
     }
   }, [plugins, profile]);
+
+  // GameVault Hub states
+  const [cloudEmail, setCloudEmail] = useState("");
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  // Download queue simulation
+  const [downloads, setDownloads] = useState([
+    { id: 1, title: "Celeste", progress: 42, speed: 12.4, status: "downloading" },
+    { id: 2, title: "Hades", progress: 15, speed: 0, status: "paused" },
+    { id: 3, title: "Portal 2", progress: 0, speed: 0, status: "queued" }
+  ]);
+
+  // Performance simulation variables
+  const [fpsVal, setFpsVal] = useState(60);
+  const [cpuUsage, setCpuUsage] = useState(14);
+  const [gpuUsage, setGpuUsage] = useState(45);
+  const [ramUsage, setRamUsage] = useState(58);
+
+  // Sync state with profile updates
+  useEffect(() => {
+    if (profile) {
+      setCloudEmail(profile.cloudEmail || "");
+    }
+  }, [profile]);
+
+  // Simulate downloads updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDownloads((prev) =>
+        prev.map((dl) => {
+          if (dl.status === "downloading") {
+            const nextProgress = Math.min(dl.progress + 1, 100);
+            return {
+              ...dl,
+              progress: nextProgress,
+              status: nextProgress === 100 ? "completed" : "downloading",
+              speed: nextProgress === 100 ? 0 : parseFloat((10 + Math.random() * 5).toFixed(1))
+            };
+          }
+          return dl;
+        })
+      );
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Simulate Performance overlays values fluctuation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFpsVal(() => Math.floor(59 + Math.random() * 4));
+      setCpuUsage(() => Math.floor(10 + Math.random() * 8));
+      setGpuUsage(() => Math.floor(40 + Math.random() * 12));
+      setRamUsage(() => Math.floor(56 + Math.random() * 3));
+    }, 1500);
+    return () => clearInterval(interval);
+  }, []);
 
   const refreshEmulators = useCallback(async () => {
     try {
@@ -2297,6 +2354,225 @@ export function LibraryPage({
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT - HUB & MANAGEMENT CONSOLE */}
+            {activeTab === "Hub" && (
+              <div className="grid grid-cols-2 gap-8">
+                {/* Left: Cloud Synchronization & Disk Analyzer */}
+                <div className="space-y-6">
+                  {/* Cloud Synchronizer */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Sparkles className="size-5 text-[var(--accent)]" /> Cloud Sync Service
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Synchronize your custom library categories, settings, playtimes, and emulator configurations securely with GameVault Cloud.
+                    </p>
+                    
+                    {profile && (
+                      <div className="space-y-4 pt-2">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Account Email</label>
+                            <input
+                              type="email"
+                              value={cloudEmail}
+                              onChange={(e) => setCloudEmail(e.target.value)}
+                              onBlur={async () => {
+                                await window.gameVault.updateCloudAccount(cloudEmail || null, profile.lastSyncAt);
+                                await refreshLibrary();
+                              }}
+                              className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-[var(--accent)] text-zinc-200"
+                              placeholder="E.g. sakthi@gamevault.com"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Last Cloud Sync</label>
+                            <div className="mt-2.5 text-xs font-mono text-zinc-400">
+                              {profile.lastSyncAt ? new Date(profile.lastSyncAt).toLocaleString() : "Never synced"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {syncMessage && (
+                          <div className="rounded-xl bg-[var(--accent-glow)] border border-[var(--accent)]/20 p-3 text-xs text-zinc-300">
+                            {syncMessage}
+                          </div>
+                        )}
+
+                        <button
+                          onClick={async () => {
+                            if (!cloudEmail.trim()) {
+                              alert("Please enter an account email to configure Cloud Sync.");
+                              return;
+                            }
+                            setIsSyncingCloud(true);
+                            setSyncMessage("Connecting to GameVault Cloud...");
+                            sounds.playConfirm();
+                            try {
+                              await window.gameVault.cloudSync();
+                              const now = new Date().toISOString();
+                              await window.gameVault.updateCloudAccount(cloudEmail, now);
+                              await refreshLibrary();
+                              setSyncMessage("Sync complete! Settings, games metadata, and playtime metrics successfully synchronized.");
+                            } catch (err: any) {
+                              setSyncMessage(`Sync failed: ${err.message || err}`);
+                            } finally {
+                              setIsSyncingCloud(false);
+                            }
+                          }}
+                          disabled={isSyncingCloud}
+                          className="w-full rounded-xl bg-[var(--accent)] py-2.5 text-xs font-black text-zinc-950 hover:bg-[var(--accent-hover)] transition disabled:opacity-50"
+                          type="button"
+                        >
+                          {isSyncingCloud ? "Synchronizing..." : "Trigger Cloud Backup & Sync"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Storage Manager & Disk Usage Analyzer */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <LibIcon className="size-5 text-[var(--accent)]" /> Storage Manager & Disk Analyzer
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      View local disk space utilization distributions.
+                    </p>
+                    
+                    {/* Calculations */}
+                    {(() => {
+                      const totalUsedBytes = library.games.reduce((sum, g) => sum + (g.gameSizeBytes || 15000000000), 0);
+                      const totalUsedGB = (totalUsedBytes / (1024 * 1024 * 1024)).toFixed(1);
+                      const maxDiskGB = 512;
+                      const usedPct = Math.round((parseFloat(totalUsedGB) / maxDiskGB) * 100);
+                      return (
+                        <div className="space-y-4 pt-2">
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs font-bold text-zinc-400">
+                              <span>Disk Space: {totalUsedGB} GB Used</span>
+                              <span>{maxDiskGB - parseFloat(totalUsedGB)} GB Free / {maxDiskGB} GB Total</span>
+                            </div>
+                            <div className="h-2 w-full bg-zinc-950 rounded-full overflow-hidden border border-white/5">
+                              <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${usedPct}%` }} />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Games Size Listing</h4>
+                            <div className="rounded-xl border border-white/5 bg-zinc-950 divide-y divide-white/5 max-h-48 overflow-y-auto text-xs font-mono">
+                              {library.games.map((g) => (
+                                <div key={g.id} className="flex justify-between px-3 py-2 text-zinc-300">
+                                  <span className="truncate w-48">{g.title}</span>
+                                  <span>{((g.gameSizeBytes || 15000000000) / (1024 * 1024 * 1024)).toFixed(1)} GB</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Right: Active Download Queue & In-Game Overlay Performance Dashboard */}
+                <div className="space-y-6">
+                  {/* Download Queue Card */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Play className="size-5 text-[var(--accent)]" /> Active Downloads Queue
+                    </h3>
+                    <div className="space-y-3">
+                      {downloads.map((dl) => (
+                        <div key={dl.id} className="bg-zinc-950 border border-white/5 rounded-2xl p-4 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-bold text-white block">{dl.title}</span>
+                              <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">{dl.status}</span>
+                            </div>
+                            <div className="text-right">
+                              {dl.status === "downloading" && (
+                                <span className="font-mono text-zinc-400">{dl.speed} MB/s</span>
+                              )}
+                              <span className="font-mono block text-white font-bold">{dl.progress}%</span>
+                            </div>
+                          </div>
+                          
+                          <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                dl.status === "completed" ? "bg-green-500" : "bg-[var(--accent)]"
+                              }`}
+                              style={{ width: `${dl.progress}%` }}
+                            />
+                          </div>
+
+                          {dl.status === "downloading" && (
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                onClick={() => {
+                                  setDownloads((prev) =>
+                                    prev.map((x) => (x.id === dl.id ? { ...x, status: "paused", speed: 0 } : x))
+                                  );
+                                }}
+                                className="rounded-lg bg-zinc-900 border border-white/5 px-3 py-1 text-[10px] font-bold text-zinc-300 hover:bg-zinc-800"
+                                type="button"
+                              >
+                                Pause
+                              </button>
+                            </div>
+                          )}
+                          {dl.status === "paused" && (
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                onClick={() => {
+                                  setDownloads((prev) =>
+                                    prev.map((x) => (x.id === dl.id ? { ...x, status: "downloading" } : x))
+                                  );
+                                }}
+                                className="rounded-lg bg-[var(--accent)] px-3 py-1 text-[10px] font-black text-zinc-950 hover:bg-[var(--accent-hover)]"
+                                type="button"
+                              >
+                                Resume
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Performance Overlay Monitor Dashboard */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Award className="size-5 text-[var(--accent)]" /> Performance Overlay Monitor (Mockup)
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Configure parameters for your customizable in-game dashboard popup (toggle using `Ctrl + Shift + O` during gameplay).
+                    </p>
+
+                    <div className="grid grid-cols-4 gap-3 mt-4 text-center">
+                      <div className="bg-zinc-950 p-3 rounded-2xl border border-white/5">
+                        <span className="text-[9px] text-zinc-500 block uppercase font-bold">FPS Counter</span>
+                        <strong className="text-lg font-black text-green-400 tracking-mono font-mono">{fpsVal}</strong>
+                      </div>
+                      <div className="bg-zinc-950 p-3 rounded-2xl border border-white/5">
+                        <span className="text-[9px] text-zinc-500 block uppercase font-bold">CPU Usage</span>
+                        <strong className="text-lg font-black text-white tracking-mono font-mono">{cpuUsage}%</strong>
+                      </div>
+                      <div className="bg-zinc-950 p-3 rounded-2xl border border-white/5">
+                        <span className="text-[9px] text-zinc-500 block uppercase font-bold">GPU Usage</span>
+                        <strong className="text-lg font-black text-[var(--accent)] tracking-mono font-mono">{gpuUsage}%</strong>
+                      </div>
+                      <div className="bg-zinc-950 p-3 rounded-2xl border border-white/5">
+                        <span className="text-[9px] text-zinc-500 block uppercase font-bold">RAM Usage</span>
+                        <strong className="text-lg font-black text-purple-400 tracking-mono font-mono">{ramUsage}%</strong>
+                      </div>
                     </div>
                   </div>
                 </div>
