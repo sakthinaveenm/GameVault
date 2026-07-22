@@ -74,10 +74,17 @@ function parseAcf(content: string): { name?: string; appid?: string; installdir?
   return result;
 }
 
-export async function scanSteamGames(): Promise<ScannedPlatformGame[]> {
+export async function scanSteamGames(customSteamDir?: string | null): Promise<ScannedPlatformGame[]> {
   const games: ScannedPlatformGame[] = [];
-  const steamDir = await getSteamManifestDir();
+  let steamDir = customSteamDir || await getSteamManifestDir();
   if (!steamDir) return games;
+
+  if (customSteamDir) {
+    const lower = steamDir.toLowerCase();
+    if (!lower.endsWith("steamapps") && !lower.endsWith("steamapps/") && !lower.endsWith("steamapps\\")) {
+      steamDir = path.join(steamDir, "steamapps");
+    }
+  }
 
   try {
     const entries = await readdir(steamDir);
@@ -106,6 +113,34 @@ export async function scanSteamGames(): Promise<ScannedPlatformGame[]> {
   return games;
 }
 
+async function fetchSteamCoverUrl(title: string): Promise<string | null> {
+  try {
+    // Sanitize title to remove enhancements or common edition markers for better search matches
+    const cleanTitle = title
+      .replace(/\b(enhanced|gold|ultimate|goty|edition|deluxe|complete|remastered)\b/gi, "")
+      .trim();
+
+    const url = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(cleanTitle)}&l=english&cc=US`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+
+    const data: any = await res.json();
+    if (data && data.items && data.items.length > 0) {
+      // Find the best match, fallback to the first result
+      const match = data.items.find(
+        (item: any) => item.name.toLowerCase() === title.toLowerCase()
+      ) || data.items[0];
+
+      if (match && match.id) {
+        return `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${match.id}/library_600x900.jpg`;
+      }
+    }
+  } catch (err) {
+    console.error(`Failed to fetch Steam cover for "${title}":`, err);
+  }
+  return null;
+}
+
 export async function scanEpicGames(): Promise<ScannedPlatformGame[]> {
   const games: ScannedPlatformGame[] = [];
   const epicDir = await getEpicManifestDir();
@@ -113,13 +148,16 @@ export async function scanEpicGames(): Promise<ScannedPlatformGame[]> {
 
   try {
     const entries = await readdir(epicDir);
-    for (const entry of entries) {
-      if (entry.endsWith(".item")) {
+    const manifests = entries.filter((entry) => entry.endsWith(".item"));
+
+    const scanPromises = manifests.map(async (entry) => {
+      try {
         const filePath = path.join(epicDir, entry);
         const content = await readFile(filePath, "utf-8");
         const parsed = JSON.parse(content);
         if (parsed.AppName && parsed.DisplayName) {
-          games.push({
+          const coverPath = await fetchSteamCoverUrl(parsed.DisplayName);
+          return {
             title: parsed.DisplayName,
             executablePath: `com.epicgames.launcher://apps/${parsed.AppName}?action=launch&silent=true`,
             platform: "epic",
@@ -127,9 +165,18 @@ export async function scanEpicGames(): Promise<ScannedPlatformGame[]> {
             developer: parsed.DeveloperName || "Epic Games Launcher",
             publisher: "Epic Games",
             genres: "Epic Games",
-          });
+            coverPath: coverPath || undefined,
+          };
         }
+      } catch (err) {
+        console.error("Error parsing Epic manifest item:", err);
       }
+      return null;
+    });
+
+    const results = await Promise.all(scanPromises);
+    for (const game of results) {
+      if (game) games.push(game);
     }
   } catch (err) {
     console.log("Epic Manifest directory not detected, skipping scan.");
