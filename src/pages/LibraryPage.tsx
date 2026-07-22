@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { useBigPictureControls } from "../hooks/useBigPictureControls";
 import { useUiSounds } from "../hooks/useUiSounds";
 import type { Game, LibraryState, Profile, Achievement } from "../types/window";
@@ -412,6 +412,71 @@ export function LibraryPage({
     showToast("Settings updated", "success");
   };
 
+  const allGenres = Array.from(
+    new Set(
+      library.games
+        .map((g) => g.genres)
+        .filter(Boolean)
+        .flatMap((g) => g!.split(",").map((x) => x.trim()))
+    )
+  ).sort();
+
+  // Filter games based on search query, favorites, platform filters, hidden status, collections, playtime, and genre filters
+  const filteredGames = library.games.filter((game) => {
+    if (favoritesOnly && !game.isFavorite) return false;
+    if (selectedPlatform !== "all" && game.platform !== selectedPlatform) return false;
+    
+    // Fuzzy token matching search
+    if (normalizedQuery) {
+      const tokens = normalizedQuery.split(/\s+/);
+      const searchString = `${game.title} ${game.developer || ""} ${game.publisher || ""} ${game.genres || ""}`.toLowerCase();
+      const matchesAll = tokens.every((token) => searchString.includes(token));
+      if (!matchesAll) return false;
+    }
+
+    if (!showHiddenGames && game.isHidden) return false;
+    
+    // Playtime filtering
+    if (playtimeFilter !== "all") {
+      const hrs = game.playtimeSeconds / 3600;
+      if (playtimeFilter === "short" && hrs >= 10) return false;
+      if (playtimeFilter === "medium" && (hrs < 10 || hrs > 100)) return false;
+      if (playtimeFilter === "long" && hrs <= 100) return false;
+    }
+
+    // Genre filtering
+    if (selectedGenreFilter !== "all") {
+      if (!game.genres || !game.genres.toLowerCase().includes(selectedGenreFilter.toLowerCase())) return false;
+    }
+
+    if (selectedCollectionId !== null) {
+      const collection = library.collections.find((c) => c.id === selectedCollectionId);
+      if (collection) {
+        if (collection.rules) {
+          return matchSmartRules(game, collection.rules);
+        } else {
+          return collectionGameIds.includes(game.id);
+        }
+      }
+    }
+    return true;
+  });
+
+  // Apply sorting
+  const sortedGames = [...filteredGames].sort((a, b) => {
+    if (sortBy === "playtime") {
+      return b.playtimeSeconds - a.playtimeSeconds;
+    }
+    if (sortBy === "lastPlayed") {
+      if (!a.lastPlayedAt) return 1;
+      if (!b.lastPlayedAt) return -1;
+      return new Date(b.lastPlayedAt).getTime() - new Date(a.lastPlayedAt).getTime();
+    }
+    return a.title.localeCompare(b.title);
+  });
+
+  const visibleGames = sortedGames.slice(0, renderedCount);
+
   // Keyboard navigation & resets
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -657,71 +722,6 @@ export function LibraryPage({
       setMessage(`Imported "${name}" successfully.`);
     }
   };
-
-  const allGenres = Array.from(
-    new Set(
-      library.games
-        .map((g) => g.genres)
-        .filter(Boolean)
-        .flatMap((g) => g!.split(",").map((x) => x.trim()))
-    )
-  ).sort();
-
-  // Filter games based on search query, favorites, platform filters, hidden status, collections, playtime, and genre filters
-  const filteredGames = library.games.filter((game) => {
-    if (favoritesOnly && !game.isFavorite) return false;
-    if (selectedPlatform !== "all" && game.platform !== selectedPlatform) return false;
-    
-    // Fuzzy token matching search
-    if (normalizedQuery) {
-      const tokens = normalizedQuery.split(/\s+/);
-      const searchString = `${game.title} ${game.developer || ""} ${game.publisher || ""} ${game.genres || ""}`.toLowerCase();
-      const matchesAll = tokens.every((token) => searchString.includes(token));
-      if (!matchesAll) return false;
-    }
-
-    if (!showHiddenGames && game.isHidden) return false;
-    
-    // Playtime filtering
-    if (playtimeFilter !== "all") {
-      const hrs = game.playtimeSeconds / 3600;
-      if (playtimeFilter === "short" && hrs >= 10) return false;
-      if (playtimeFilter === "medium" && (hrs < 10 || hrs > 100)) return false;
-      if (playtimeFilter === "long" && hrs <= 100) return false;
-    }
-
-    // Genre filtering
-    if (selectedGenreFilter !== "all") {
-      if (!game.genres || !game.genres.toLowerCase().includes(selectedGenreFilter.toLowerCase())) return false;
-    }
-
-    if (selectedCollectionId !== null) {
-      const collection = library.collections.find((c) => c.id === selectedCollectionId);
-      if (collection) {
-        if (collection.rules) {
-          return matchSmartRules(game, collection.rules);
-        } else {
-          return collectionGameIds.includes(game.id);
-        }
-      }
-    }
-    return true;
-  });
-
-  // Apply sorting
-  const sortedGames = [...filteredGames].sort((a, b) => {
-    if (sortBy === "playtime") {
-      return b.playtimeSeconds - a.playtimeSeconds;
-    }
-    if (sortBy === "lastPlayed") {
-      if (!a.lastPlayedAt) return 1;
-      if (!b.lastPlayedAt) return -1;
-      return new Date(b.lastPlayedAt).getTime() - new Date(a.lastPlayedAt).getTime();
-    }
-    return a.title.localeCompare(b.title);
-  });
-
-  const visibleGames = sortedGames.slice(0, renderedCount);
 
   // Calculate Recently Played (Continue Playing)
   const recentlyPlayed = [...library.games]
