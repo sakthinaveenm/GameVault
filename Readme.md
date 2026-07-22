@@ -304,23 +304,23 @@ GameVault/
 
 ### Profiles
 
-* [ ] Achievement showcase
-* [ ] Favorite games showcase
-* [ ] Custom profile themes
+* [x] Achievement showcase
+* [x] Favorite games showcase
+* [x] Custom profile themes
 
 ### Statistics
 
-* [ ] Monthly playtime charts
-* [ ] Yearly gaming recap
-* [ ] Platform statistics
-* [ ] Genre statistics
-* [ ] Achievement statistics
+* [x] Monthly playtime charts
+* [x] Yearly gaming recap
+* [x] Platform statistics
+* [x] Genre statistics
+* [x] Achievement statistics
 
 ### Activity
 
-* [ ] Recently completed games
-* [ ] Recently installed games
-* [ ] Gaming timeline
+* [x] Recently completed games
+* [x] Recently installed games
+* [x] Gaming timeline
 
 ---
 

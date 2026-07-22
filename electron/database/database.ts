@@ -181,6 +181,25 @@ const migrations = [
       );
     `,
   },
+  {
+    version: 12,
+    name: "add_v1_4_social_and_achievements",
+    up: `
+      ALTER TABLE games ADD COLUMN is_completed INTEGER NOT NULL DEFAULT 0 CHECK (is_completed IN (0, 1));
+      ALTER TABLE games ADD COLUMN showcased INTEGER NOT NULL DEFAULT 0 CHECK (showcased IN (0, 1));
+      CREATE TABLE IF NOT EXISTS achievements (
+        id INTEGER PRIMARY KEY,
+        game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        icon_path TEXT,
+        unlocked INTEGER NOT NULL DEFAULT 0 CHECK (unlocked IN (0, 1)),
+        unlocked_at TEXT,
+        showcased INTEGER NOT NULL DEFAULT 0 CHECK (showcased IN (0, 1))
+      );
+      CREATE INDEX IF NOT EXISTS idx_achievements_game ON achievements(game_id);
+    `,
+  },
 ] as const;
 
 export class Database {
@@ -231,7 +250,7 @@ export class Database {
 
   getGames(): Game[] {
     const rows = this.connection.prepare(`
-      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite, description, cover_path, developer, publisher, genres, release_date, platform, platform_game_id, launch_arguments, is_hidden
+      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite, description, cover_path, developer, publisher, genres, release_date, platform, platform_game_id, launch_arguments, is_hidden, is_completed, showcased
       FROM games
       ORDER BY title COLLATE NOCASE ASC
     `).all() as Array<{
@@ -252,6 +271,8 @@ export class Database {
       platform_game_id: string | null;
       launch_arguments: string | null;
       is_hidden: number;
+      is_completed: number;
+      showcased: number;
     }>;
 
     return rows.map((game) => ({
@@ -272,6 +293,8 @@ export class Database {
       platformGameId: game.platform_game_id,
       launchArguments: game.launch_arguments,
       isHidden: game.is_hidden === 1,
+      isCompleted: game.is_completed === 1,
+      showcased: game.showcased === 1,
     }));
   }
 
@@ -316,6 +339,10 @@ export class Database {
           game.genres || null,
           game.releaseDate || null
         );
+        const row = this.connection.prepare("SELECT id FROM games WHERE executable_path = ?").get(game.executablePath) as { id: number };
+        if (row) {
+          this.seedMockAchievements(row.id);
+        }
       }
     });
     importAll(games);
@@ -432,11 +459,25 @@ export class Database {
 
   recordGameStart(gameId: number): void {
     this.connection.prepare("UPDATE games SET last_played_at = datetime('now', 'localtime') WHERE id = ?").run(gameId);
+    this.connection.prepare(`
+      UPDATE achievements 
+      SET unlocked = 1, unlocked_at = datetime('now', 'localtime') 
+      WHERE game_id = ? AND title = 'First Blood' AND unlocked = 0
+    `).run(gameId);
   }
 
   incrementPlaytime(gameId: number, seconds: number): void {
     if (seconds < 0) return;
     this.connection.prepare("UPDATE games SET playtime_seconds = playtime_seconds + ? WHERE id = ?").run(seconds, gameId);
+    
+    const game = this.connection.prepare("SELECT playtime_seconds FROM games WHERE id = ?").get(gameId) as { playtime_seconds: number };
+    if (game && game.playtime_seconds >= 3600) {
+      this.connection.prepare(`
+        UPDATE achievements 
+        SET unlocked = 1, unlocked_at = datetime('now', 'localtime') 
+        WHERE game_id = ? AND title = 'Veteran Player' AND unlocked = 0
+      `).run(gameId);
+    }
   }
 
   addGame(
@@ -474,7 +515,9 @@ export class Database {
       metadata.platformGameId || null
     );
 
-    return Number(result.lastInsertRowid);
+    const gameId = Number(result.lastInsertRowid);
+    this.seedMockAchievements(gameId);
+    return gameId;
   }
 
   deleteGame(gameId: number): void {
@@ -612,6 +655,87 @@ export class Database {
       executablePath: row.executable_path,
       platform: row.platform,
       defaultArguments: row.default_arguments,
+    }));
+  }
+
+  seedMockAchievements(gameId: number): void {
+    const check = this.connection.prepare("SELECT COUNT(*) as count FROM achievements WHERE game_id = ?").get(gameId) as { count: number };
+    if (check.count > 0) return;
+
+    this.connection.prepare(`
+      INSERT INTO achievements (game_id, title, description, icon_path)
+      VALUES 
+        (?, 'First Blood', 'Launch this game for the first time.', 'trophy-first-play'),
+        (?, 'Veteran Player', 'Accumulate 1 hour of playtime.', 'trophy-veteran'),
+        (?, 'Perfectionist', 'Complete the main campaign story.', 'trophy-completionist')
+    `).run(gameId, gameId, gameId);
+  }
+
+  getAchievements(gameId?: number): Array<{ id: number; gameId: number; title: string; description: string; unlocked: boolean; unlockedAt: string | null; showcased: boolean }> {
+    let rows;
+    if (gameId !== undefined) {
+      rows = this.connection.prepare("SELECT id, game_id, title, description, unlocked, unlocked_at, showcased FROM achievements WHERE game_id = ?").all(gameId);
+    } else {
+      rows = this.connection.prepare("SELECT id, game_id, title, description, unlocked, unlocked_at, showcased FROM achievements").all();
+    }
+    return (rows as any[]).map((row) => ({
+      id: row.id,
+      gameId: row.game_id,
+      title: row.title,
+      description: row.description,
+      unlocked: row.unlocked === 1,
+      unlockedAt: row.unlocked_at,
+      showcased: row.showcased === 1,
+    }));
+  }
+
+  setAchievementShowcased(id: number, showcased: boolean): void {
+    this.connection.prepare("UPDATE achievements SET showcased = ? WHERE id = ?").run(showcased ? 1 : 0, id);
+  }
+
+  setGameShowcased(id: number, showcased: boolean): void {
+    this.connection.prepare("UPDATE games SET showcased = ? WHERE id = ?").run(showcased ? 1 : 0, id);
+  }
+
+  setGameCompleted(id: number, completed: boolean): void {
+    this.connection.prepare("UPDATE games SET is_completed = ? WHERE id = ?").run(completed ? 1 : 0, id);
+    if (completed) {
+      this.connection.prepare(`
+        UPDATE achievements 
+        SET unlocked = 1, unlocked_at = datetime('now', 'localtime') 
+        WHERE game_id = ? AND title = 'Perfectionist' AND unlocked = 0
+      `).run(id);
+    } else {
+      this.connection.prepare(`
+        UPDATE achievements 
+        SET unlocked = 0, unlocked_at = NULL 
+        WHERE game_id = ? AND title = 'Perfectionist'
+      `).run(id);
+    }
+  }
+
+  getLaunchTimeline(): Array<{ id: number; gameTitle: string; platform: string; coverPath: string | null; launchedAt: string; durationSeconds: number }> {
+    const rows = this.connection.prepare(`
+      SELECT l.id, g.title as game_title, g.platform, g.cover_path, l.launched_at, l.duration_seconds
+      FROM game_launches l
+      JOIN games g ON l.game_id = g.id
+      ORDER BY l.launched_at DESC
+      LIMIT 50
+    `).all() as Array<{
+      id: number;
+      game_title: string;
+      platform: string;
+      cover_path: string | null;
+      launched_at: string;
+      duration_seconds: number;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      gameTitle: row.game_title,
+      platform: row.platform,
+      coverPath: row.cover_path,
+      launchedAt: row.launched_at,
+      durationSeconds: row.duration_seconds,
     }));
   }
 

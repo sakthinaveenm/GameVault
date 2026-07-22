@@ -65,6 +65,13 @@ contextBridge.exposeInMainWorld("gameVault", {
   scanRoms: (emulatorId: number, folderPath: string, extensions: string) =>
     ipcRenderer.invoke("emulators:scan-roms", emulatorId, folderPath, extensions),
 
+  // Achievements & Showcases
+  getAchievements: (gameId?: number) => ipcRenderer.invoke("achievements:get", gameId),
+  toggleAchievementShowcase: (achievementId: number, showcased: boolean) => ipcRenderer.invoke("achievements:toggle-showcase", achievementId, showcased),
+  toggleGameShowcase: (gameId: number, showcased: boolean) => ipcRenderer.invoke("games:toggle-showcase", gameId, showcased),
+  toggleGameCompleted: (gameId: number, completed: boolean) => ipcRenderer.invoke("games:toggle-completed", gameId, completed),
+  getLaunchTimeline: () => ipcRenderer.invoke("library:get-timeline"),
+
   // Events
   onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => {
     const listener = (_event: any, data: any) => callback(data);

@@ -58,6 +58,13 @@ declare global {
       deleteEmulator: (id: number) => Promise<void>;
       scanRoms: (emulatorId: number, folderPath: string, extensions: string) => Promise<{ count: number }>;
 
+      // Achievements & Showcases
+      getAchievements: (gameId?: number) => Promise<Achievement[]>;
+      toggleAchievementShowcase: (achievementId: number, showcased: boolean) => Promise<void>;
+      toggleGameShowcase: (gameId: number, showcased: boolean) => Promise<void>;
+      toggleGameCompleted: (gameId: number, completed: boolean) => Promise<void>;
+      getLaunchTimeline: () => Promise<Array<{ id: number; gameTitle: string; platform: string; coverPath: string | null; launchedAt: string; durationSeconds: number }>>;
+
       // Events
       onGameStatus: (callback: (data: { gameId: number; status: "started" | "stopped" | "error"; sessionDuration?: number }) => void) => () => void;
     };
@@ -80,6 +87,8 @@ export type Game = {
   releaseDate?: string | null;
   platform: string;
   platformGameId?: string | null;
+  isCompleted: boolean;
+  showcased: boolean;
 };
 
 export type Profile = {
@@ -106,4 +115,15 @@ export type Emulator = {
   executablePath: string;
   platform: string;
   defaultArguments: string;
+};
+
+export type Achievement = {
+  id: number;
+  gameId: number;
+  title: string;
+  description: string;
+  iconPath: string | null;
+  unlocked: boolean;
+  unlockedAt: string | null;
+  showcased: boolean;
 };

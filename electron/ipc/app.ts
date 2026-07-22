@@ -389,6 +389,32 @@ export function registerAppIpc(database: Database): void {
     }
     return { count };
   });
+
+  ipcMain.handle("achievements:get", (_event, gameId: unknown) => {
+    return database.getAchievements(gameId !== undefined ? Number(gameId) : undefined);
+  });
+
+  ipcMain.handle("achievements:toggle-showcase", (_event, achievementId: unknown, showcased: unknown) => {
+    if (typeof achievementId !== "number" || typeof showcased !== "boolean") throw new Error("Invalid request.");
+    database.setAchievementShowcased(achievementId, showcased);
+    return true;
+  });
+
+  ipcMain.handle("games:toggle-showcase", (_event, gameId: unknown, showcased: unknown) => {
+    if (typeof gameId !== "number" || typeof showcased !== "boolean") throw new Error("Invalid request.");
+    database.setGameShowcased(gameId, showcased);
+    return true;
+  });
+
+  ipcMain.handle("games:toggle-completed", (_event, gameId: unknown, completed: unknown) => {
+    if (typeof gameId !== "number" || typeof completed !== "boolean") throw new Error("Invalid request.");
+    database.setGameCompleted(gameId, completed);
+    return true;
+  });
+
+  ipcMain.handle("library:get-timeline", () => {
+    return database.getLaunchTimeline();
+  });
 }
 
 async function scanForRoms(directory: string, extensionsList: string[]): Promise<Array<{ title: string; path: string }>> {

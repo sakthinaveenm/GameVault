@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useBigPictureControls } from "../hooks/useBigPictureControls";
 import { useUiSounds } from "../hooks/useUiSounds";
-import type { Game, LibraryState, Profile } from "../types/window";
+import type { Game, LibraryState, Profile, Achievement } from "../types/window";
 import { GameDetailsPage } from "./GameDetailsPage";
 import { CustomizationSettings } from "../components/CustomizationSettings";
 import { ProfileModal } from "../components/ProfileModal";
@@ -162,6 +162,34 @@ export function LibraryPage({
   const [scanEmuId, setScanEmuId] = useState<number | null>(null);
   const [scanFolder, setScanFolder] = useState("");
   const [scanExtensions, setScanExtensions] = useState(".sfc,.smc");
+
+  // Achievements & Timeline state
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [timeline, setTimeline] = useState<any[]>([]);
+
+  const refreshAchievements = useCallback(async () => {
+    try {
+      const list = await window.gameVault.getAchievements();
+      setAchievements(list);
+    } catch (err) {
+      console.error("Failed to load achievements:", err);
+    }
+  }, []);
+
+  const refreshTimeline = useCallback(async () => {
+    try {
+      const list = await window.gameVault.getLaunchTimeline();
+      setTimeline(list);
+    } catch (err) {
+      console.error("Failed to load timeline:", err);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    void refreshAchievements();
+    void refreshTimeline();
+  }, [refreshAchievements, refreshTimeline]);
 
   const refreshEmulators = useCallback(async () => {
     try {
@@ -550,6 +578,8 @@ export function LibraryPage({
 
   async function refreshLibrary() {
     onLibraryUpdated(await window.gameVault.getLibraryState());
+    void refreshAchievements();
+    void refreshTimeline();
   }
 
   async function handleChooseFolder() {
@@ -990,6 +1020,164 @@ export function LibraryPage({
                             </p>
                           </div>
                         </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Showcase Widget */}
+                <div className="grid grid-cols-2 gap-8">
+                  {/* Pinned Games Showcase */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-base font-bold flex items-center gap-2">
+                      <Heart className="size-4 text-[var(--accent)]" /> Pinned Games Showcase
+                    </h3>
+                    {library.games.filter((g) => g.showcased).length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-white/5 py-12 text-center text-zinc-500 text-xs">
+                        No games pinned. Click "Showcase Game" inside game details to feature titles here!
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-3">
+                        {library.games.filter((g) => g.showcased).map((game) => (
+                          <div key={game.id} className="relative rounded-xl overflow-hidden bg-zinc-950 border border-white/5 aspect-[3/4] group">
+                            {game.coverPath ? (
+                              <img src={game.coverPath} alt={game.title} className="size-full object-cover" />
+                            ) : (
+                              <div className="size-full flex items-center justify-center text-2xl">🎮</div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent flex flex-col justify-end p-2 opacity-0 group-hover:opacity-100 transition">
+                              <span className="text-[10px] font-bold text-white block truncate">{game.title}</span>
+                              <span className="text-[8px] text-[var(--accent)] font-mono">{formatPlaytime(game.playtimeSeconds)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pinned Achievements Showcase */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-base font-bold flex items-center gap-2">
+                      <Award className="size-4 text-[var(--accent)]" /> Pinned Trophies Showcase
+                    </h3>
+                    {achievements.filter((a) => a.showcased).length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-white/5 py-12 text-center text-zinc-500 text-xs">
+                        No trophies pinned. Pin unlocked achievements to show them off!
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-3">
+                        {achievements.filter((a) => a.showcased).map((ach) => (
+                          <div key={ach.id} className="rounded-xl bg-zinc-950 border border-white/5 p-3 flex flex-col items-center justify-center text-center space-y-1">
+                            <span className="text-2xl">🏆</span>
+                            <span className="text-[9px] font-bold text-white block truncate w-full">{ach.title}</span>
+                            <span className="text-[8px] text-zinc-500 block truncate w-full">{ach.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Statistics & Yearly Gaming Recap */}
+                <div className="grid grid-cols-3 gap-6">
+                  {/* Genre Stats */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-sm font-bold text-zinc-300">Top Genres</h3>
+                    <div className="space-y-2">
+                      {Array.from(
+                        new Set(
+                          library.games
+                            .map((g) => g.genres)
+                            .filter(Boolean)
+                            .flatMap((g) => g!.split(",").map((x) => x.trim()))
+                        )
+                      )
+                        .slice(0, 4)
+                        .map((genre) => {
+                          const count = library.games.filter((g) => g.genres && g.genres.includes(genre)).length;
+                          const pct = Math.round((count / Math.max(library.games.length, 1)) * 100);
+                          return (
+                            <div key={genre} className="space-y-1">
+                              <div className="flex justify-between text-[10px] text-zinc-400 font-bold">
+                                <span>{genre}</span>
+                                <span>{count} game{count === 1 ? "" : "s"}</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-zinc-950 rounded-full overflow-hidden">
+                                <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  {/* Platform Stats */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-sm font-bold text-zinc-300">Platforms Ratio</h3>
+                    <div className="space-y-2">
+                      {["steam", "epic", "gog", "local", "emulator"].map((plat) => {
+                        const count = library.games.filter((g) => g.platform === plat).length;
+                        if (count === 0) return null;
+                        const pct = Math.round((count / library.games.length) * 100);
+                        return (
+                          <div key={plat} className="space-y-1">
+                            <div className="flex justify-between text-[10px] text-zinc-400 font-bold">
+                              <span>{platformLabels[plat] || plat}</span>
+                              <span>{pct}%</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-zinc-950 rounded-full overflow-hidden">
+                              <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Trophies completion summary */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-sm font-bold text-zinc-300">Achievements Progress</h3>
+                    <div className="flex items-center gap-4">
+                      <div className="relative size-16 grid place-items-center bg-zinc-950 border border-white/5 rounded-full">
+                        <span className="text-xs font-black text-white">
+                          {Math.round(
+                            (achievements.filter((a) => a.unlocked).length / Math.max(achievements.length, 1)) * 100
+                          )}%
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-xs">
+                        <p className="text-zinc-400">Total Unlocked: <strong>{achievements.filter((a) => a.unlocked).length}</strong></p>
+                        <p className="text-zinc-500">Locked: <strong>{achievements.filter((a) => !a.unlocked).length}</strong></p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gaming timeline feed log */}
+                <div className="space-y-4">
+                  <h3 className="text-base font-bold flex items-center gap-2">
+                    <Clock className="size-4 text-[var(--accent)]" /> Gaming Timeline History
+                  </h3>
+                  {timeline.length === 0 ? (
+                    <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center text-zinc-500 text-xs">
+                      No gaming session logs. Launch any game from your library to start tracking logs!
+                    </div>
+                  ) : (
+                    <div className="border-l border-white/10 ml-3 pl-6 space-y-6">
+                      {timeline.slice(0, 8).map((log, idx) => (
+                        <div key={log.id} className="relative">
+                          {/* Timeline dot */}
+                          <div className="absolute -left-[30px] top-1.5 size-2 rounded-full bg-[var(--accent)] border border-zinc-950 shadow-md animate-pulse" />
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <span className="text-xs font-bold text-white block">{log.gameTitle}</span>
+                              <span className="text-[10px] text-zinc-500">{new Date(log.launchedAt).toLocaleString()}</span>
+                            </div>
+                            <span className="text-xs font-semibold text-zinc-400 font-mono">
+                              Played: {formatPlaytime(log.durationSeconds)}
+                            </span>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}

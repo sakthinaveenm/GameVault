@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import type { Game } from "../types/window";
-import { X, Play, Clock, Calendar, Building, Tag, FileText, Edit, Trash2, Save, RefreshCw } from "lucide-react";
+import { X, Play, Clock, Calendar, Building, Tag, FileText, Edit, Trash2, Save, RefreshCw, Award } from "lucide-react";
 import confetti from "canvas-confetti";
 
 interface GameDetailsPageProps {
@@ -47,6 +47,21 @@ export function GameDetailsPage({
     };
     void loadHistory();
   }, [game.id, isRunning]);
+
+  const [gameAchievements, setGameAchievements] = useState<any[]>([]);
+
+  const refreshGameAchievements = async () => {
+    try {
+      const list = await window.gameVault.getAchievements(game.id);
+      setGameAchievements(list);
+    } catch (err) {
+      console.error("Failed to load game achievements:", err);
+    }
+  };
+
+  useEffect(() => {
+    void refreshGameAchievements();
+  }, [game.id]);
 
   // Trigger confetti when launching game
   const handlePlayClick = () => {
@@ -161,6 +176,37 @@ export function GameDetailsPage({
               type="button"
             >
               <RefreshCw className="size-4" /> Sync Metadata
+            </button>
+            <button
+              onClick={async () => {
+                const nextVal = !game.isCompleted;
+                await window.gameVault.toggleGameCompleted(game.id, nextVal);
+                await onUpdateMetadata(game.id, { isCompleted: nextVal });
+                void refreshGameAchievements();
+              }}
+              className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                game.isCompleted
+                  ? "bg-green-950/40 border-green-500/20 text-green-200"
+                  : "bg-zinc-900/80 border-white/10 text-zinc-300 hover:bg-zinc-800"
+              }`}
+              type="button"
+            >
+              {game.isCompleted ? "✔ Completed" : "Mark Completed"}
+            </button>
+            <button
+              onClick={async () => {
+                const nextVal = !game.showcased;
+                await window.gameVault.toggleGameShowcase(game.id, nextVal);
+                await onUpdateMetadata(game.id, { showcased: nextVal });
+              }}
+              className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                game.showcased
+                  ? "bg-[var(--accent)] text-zinc-950 border-[var(--accent)]"
+                  : "bg-zinc-900/80 border-white/10 text-zinc-300 hover:bg-zinc-800"
+              }`}
+              type="button"
+            >
+              🏆 {game.showcased ? "Pinned" : "Pin Game"}
             </button>
             {onRemoveGame && (
               <button
@@ -357,6 +403,49 @@ export function GameDetailsPage({
                   </div>
                 </div>
               )}
+
+              {/* Game achievements progress log list */}
+              <div className="space-y-4 mt-8">
+                <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-zinc-500">
+                  <Award className="size-4 text-[var(--accent)]" /> Achievements & Trophies
+                </h3>
+                {gameAchievements.length === 0 ? (
+                  <p className="text-zinc-600 text-xs italic">No achievements loaded.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {gameAchievements.map((ach) => (
+                      <button
+                        key={ach.id}
+                        onClick={async () => {
+                          if (!ach.unlocked) return;
+                          const nextVal = !ach.showcased;
+                          await window.gameVault.toggleAchievementShowcase(ach.id, nextVal);
+                          void refreshGameAchievements();
+                        }}
+                        className={`rounded-2xl border p-4 text-left transition flex flex-col justify-between h-28 relative overflow-hidden group ${
+                          ach.unlocked
+                            ? "bg-zinc-900/60 border-white/10 hover:border-[var(--accent)] cursor-pointer"
+                            : "bg-zinc-950/20 border-white/5 opacity-50 cursor-not-allowed"
+                        }`}
+                        disabled={!ach.unlocked}
+                        type="button"
+                        title={ach.unlocked ? "Click to showcase/pin trophy on profile!" : "Play to unlock!"}
+                      >
+                        <div>
+                          <div className="flex justify-between items-start">
+                            <span className="text-xl">🏆</span>
+                            {ach.showcased && (
+                              <span className="bg-[var(--accent)] text-zinc-950 rounded-full px-1.5 py-0.5 text-[7px] font-black uppercase">Pinned</span>
+                            )}
+                          </div>
+                          <span className="text-xs font-bold text-white block mt-2 truncate w-full">{ach.title}</span>
+                        </div>
+                        <span className="text-[9px] text-zinc-500 block truncate w-full">{ach.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
