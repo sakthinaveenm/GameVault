@@ -20,7 +20,11 @@ import {
   Award,
   Library as LibIcon,
   Play,
-  RefreshCw
+  RefreshCw,
+  Clock,
+  Tag,
+  Save,
+  FileText
 } from "lucide-react";
 
 type AppInfo = Awaited<ReturnType<typeof window.gameVault.getAppInfo>>;
@@ -83,18 +87,401 @@ export function LibraryPage({
   const [sortBy, setSortBy] = useState<"title" | "playtime" | "lastPlayed">("title");
   const [selectedPlatform, setSelectedPlatform] = useState<string>("all");
 
+  // Manual game creation, Drag & Drop, Duplicate detection state
+  const [isManualAddOpen, setIsManualAddOpen] = useState(false);
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualPath, setManualPath] = useState("");
+  const [manualDev, setManualDev] = useState("");
+  const [manualPub, setManualPub] = useState("");
+  const [manualGenres, setManualGenres] = useState("");
+  const [manualRelDate, setManualRelDate] = useState("");
+  const [manualCover, setManualCover] = useState("");
+
+  const [dragOver, setDragOver] = useState(false);
+  const [duplicateConfirm, setDuplicateConfirm] = useState<Game | null>(null);
+  const [pendingImport, setPendingImport] = useState<{
+    title: string;
+    path: string;
+    developer?: string;
+    publisher?: string;
+    genres?: string;
+    releaseDate?: string;
+    coverPath?: string;
+    description?: string;
+  } | null>(null);
+
+  const [showHiddenGames, setShowHiddenGames] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
+  const [collectionGameIds, setCollectionGameIds] = useState<number[]>([]);
+  const [editingCollectionId, setEditingCollectionId] = useState<number | null>(null);
+  const [smartGenre, setSmartGenre] = useState("");
+  const [smartPlatform, setSmartPlatform] = useState("all");
+  const [smartDeveloper, setSmartDeveloper] = useState("");
+
   const sounds = useUiSounds();
   const exitBigPicture = useCallback(() => { void onBigPictureChange(false); }, [onBigPictureChange]);
   useBigPictureControls(isBigPicture, exitBigPicture);
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
 
-  // Filter games based on search query, favorites, and platform filters
-  const filteredGames = library.games.filter(
-    (game) => (!favoritesOnly || game.isFavorite) &&
-              (selectedPlatform === "all" || game.platform === selectedPlatform) &&
-              (!normalizedQuery || game.title.toLocaleLowerCase().includes(normalizedQuery))
-  );
+  // Virtual list state
+  const [renderedCount, setRenderedCount] = useState(24);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Keyboard navigation index state
+  const [focusedGameIndex, setFocusedGameIndex] = useState<number | null>(null);
+
+  // Custom Toast System state
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: "info" | "success" | "warning" }>>([]);
+
+  const showToast = (message: string, type: "info" | "success" | "warning" = "info") => {
+    const id = Date.now().toString() + Math.random().toString();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
+
+  // Undo/Redo settings history state
+  const [settingsHistory, setSettingsHistory] = useState<Array<{ theme: string; accentColor: string; startInFullscreen: boolean }>>([]);
+  const [historyPointer, setHistoryPointer] = useState(-1);
+
+  // Advanced Filtering state
+  const [playtimeFilter, setPlaytimeFilter] = useState<"all" | "short" | "medium" | "long">("all");
+  const [selectedGenreFilter, setSelectedGenreFilter] = useState<string>("all");
+
+  // Multi-select state
+  const [selectedGameIds, setSelectedGameIds] = useState<number[]>([]);
+
+  // Initialize settings history
+  useEffect(() => {
+    if (profile) {
+      const currentConfig = {
+        theme: profile.theme,
+        accentColor: profile.accentColor,
+        startInFullscreen: profile.startInFullscreen
+      };
+      if (settingsHistory.length === 0) {
+        setSettingsHistory([currentConfig]);
+        setHistoryPointer(0);
+      }
+    }
+  }, [profile]);
+
+  const recordSettingsChange = (theme: string, accentColor: string, startInFullscreen: boolean) => {
+    const nextConfig = { theme, accentColor, startInFullscreen };
+    const truncatedHistory = settingsHistory.slice(0, historyPointer + 1);
+    setSettingsHistory([...truncatedHistory, nextConfig]);
+    setHistoryPointer(truncatedHistory.length);
+  };
+
+  const handleUpdateSettingsWithHistory = async (
+    theme: string,
+    accentColor: string,
+    startInFullscreen: boolean,
+    libraryDir: string | null,
+    steamDir: string | null
+  ) => {
+    recordSettingsChange(theme, accentColor, startInFullscreen);
+    await onUpdateSettings(theme, accentColor, startInFullscreen, libraryDir, steamDir);
+    showToast("Settings updated", "success");
+  };
+
+  // Keyboard navigation & resets
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Focus search with '/'
+      if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[placeholder="Search your library..."]') as HTMLInputElement;
+        searchInput?.focus();
+        return;
+      }
+
+      // Escape key resets
+      if (e.key === "Escape") {
+        setQuery("");
+        setSelectedCollectionId(null);
+        setFavoritesOnly(false);
+        setSelectedPlatform("all");
+        setPlaytimeFilter("all");
+        setSelectedGenreFilter("all");
+        setFocusedGameIndex(null);
+        setSelectedGameIds([]);
+        setIsManualAddOpen(false);
+        setIsProfileOpen(false);
+        setEditingCollectionId(null);
+        return;
+      }
+
+      // Arrow navigation
+      if (!isProfileOpen && !isManualAddOpen && !selectedGameId && editingCollectionId === null && sortedGames.length > 0) {
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          setFocusedGameIndex((prev) => (prev === null ? 0 : Math.min(prev + 1, sortedGames.length - 1)));
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setFocusedGameIndex((prev) => (prev === null ? 0 : Math.max(prev - 1, 0)));
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setFocusedGameIndex((prev) => (prev === null ? 0 : Math.min(prev + 4, sortedGames.length - 1)));
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setFocusedGameIndex((prev) => (prev === null ? 0 : Math.max(prev - 4, 0)));
+        } else if (e.key === "Enter" && focusedGameIndex !== null) {
+          e.preventDefault();
+          setSelectedGameId(sortedGames[focusedGameIndex].id);
+        }
+      }
+
+      // Undo settings: Cmd+Z or Ctrl+Z
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        if (historyPointer > 0) {
+          const prevIndex = historyPointer - 1;
+          setHistoryPointer(prevIndex);
+          const config = settingsHistory[prevIndex];
+          void onUpdateSettings(
+            config.theme,
+            config.accentColor,
+            config.startInFullscreen,
+            profile?.libraryDirectory || null,
+            profile?.steamDirectory || null
+          );
+          showToast("Undone settings change", "info");
+        }
+      }
+
+      // Redo settings: Cmd+Shift+Z or Ctrl+Shift+Z or Cmd+Y or Ctrl+Y
+      if (((e.metaKey || e.ctrlKey) && e.key === "z" && e.shiftKey) || ((e.metaKey || e.ctrlKey) && e.key === "y")) {
+        e.preventDefault();
+        if (historyPointer < settingsHistory.length - 1) {
+          const nextIndex = historyPointer + 1;
+          setHistoryPointer(nextIndex);
+          const config = settingsHistory[nextIndex];
+          void onUpdateSettings(
+            config.theme,
+            config.accentColor,
+            config.startInFullscreen,
+            profile?.libraryDirectory || null,
+            profile?.steamDirectory || null
+          );
+          showToast("Redone settings change", "info");
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [sortedGames, focusedGameIndex, isProfileOpen, isManualAddOpen, selectedGameId, editingCollectionId, settingsHistory, historyPointer, profile]);
+
+  // Virtual list pagination effect
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setRenderedCount((prev) => Math.min(prev + 24, sortedGames.length));
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [sortedGames.length]);
+
+  // Reset pagination on changes
+  useEffect(() => {
+    setRenderedCount(24);
+    setFocusedGameIndex(null);
+  }, [query, selectedPlatform, selectedCollectionId, sortBy, favoritesOnly, playtimeFilter, selectedGenreFilter]);
+
+  const handleCollectionClick = async (collectionId: number) => {
+    setSelectedCollectionId(collectionId);
+    setSelectedPlatform("all");
+    setActiveTab("Library");
+    sounds.playConfirm();
+
+    const collection = library.collections.find((c) => c.id === collectionId);
+    if (collection && !collection.rules) {
+      const ids = await window.gameVault.getCollectionGames(collectionId);
+      setCollectionGameIds(ids);
+    }
+  };
+
+  const matchSmartRules = (game: Game, rulesStr?: string | null): boolean => {
+    if (!rulesStr) return true;
+    try {
+      const rules = JSON.parse(rulesStr);
+      if (!Array.isArray(rules) || rules.length === 0) return true;
+      for (const rule of rules) {
+        const { field, value } = rule;
+        if (!value) continue;
+        const gameValue = (game as any)[field];
+        if (!gameValue) return false;
+        if (!gameValue.toLowerCase().includes(value.toLowerCase())) {
+          return false;
+        }
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  };
+
+  const checkDuplicate = (title: string, path: string) => {
+    const duplicate = library.games.find(
+      (g) =>
+        (path && g.executablePath === path) ||
+        g.title.toLowerCase() === title.toLowerCase()
+    );
+    return duplicate;
+  };
+
+  const handleManualAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = manualTitle.trim();
+    if (!title) return;
+
+    const path = manualPath.trim() || `manual://game-${Date.now()}`;
+
+    const newGame = {
+      title,
+      path,
+      developer: manualDev.trim(),
+      publisher: manualPub.trim(),
+      genres: manualGenres.trim(),
+      releaseDate: manualRelDate.trim(),
+      coverPath: manualCover.trim(),
+      description: ""
+    };
+
+    const duplicate = checkDuplicate(title, manualPath.trim());
+    if (duplicate) {
+      setPendingImport(newGame);
+      setDuplicateConfirm(duplicate);
+    } else {
+      await window.gameVault.addGame(title, path, "local", {
+        developer: manualDev.trim(),
+        publisher: manualPub.trim(),
+        genres: manualGenres.trim(),
+        releaseDate: manualRelDate.trim(),
+        coverPath: manualCover.trim()
+      });
+      await refreshLibrary();
+      setManualTitle("");
+      setManualPath("");
+      setManualDev("");
+      setManualPub("");
+      setManualGenres("");
+      setManualRelDate("");
+      setManualCover("");
+      setIsManualAddOpen(false);
+      sounds.playConfirm();
+      setMessage(`Added "${title}" to library.`);
+    }
+  };
+
+  const handleRemoveGame = async (gameId: number) => {
+    await window.gameVault.deleteGame(gameId);
+    await refreshLibrary();
+    setSelectedGameId(null);
+    sounds.playConfirm();
+    setMessage("Game removed from library.");
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+
+    const file = files[0];
+    const path = file.path;
+    const name = file.name.replace(/\.[^/.]+$/, "");
+
+    const newGame = {
+      title: name,
+      path: path,
+      developer: "",
+      publisher: "",
+      genres: "",
+      releaseDate: "",
+      coverPath: "",
+      description: ""
+    };
+
+    const duplicate = checkDuplicate(name, path);
+    if (duplicate) {
+      setPendingImport(newGame);
+      setDuplicateConfirm(duplicate);
+    } else {
+      await window.gameVault.addGame(name, path, "local", {});
+      await refreshLibrary();
+      sounds.playConfirm();
+      setMessage(`Imported "${name}" successfully.`);
+    }
+  };
+
+  const allGenres = Array.from(
+    new Set(
+      library.games
+        .map((g) => g.genres)
+        .filter(Boolean)
+        .flatMap((g) => g!.split(",").map((x) => x.trim()))
+    )
+  ).sort();
+
+  // Filter games based on search query, favorites, platform filters, hidden status, collections, playtime, and genre filters
+  const filteredGames = library.games.filter((game) => {
+    if (favoritesOnly && !game.isFavorite) return false;
+    if (selectedPlatform !== "all" && game.platform !== selectedPlatform) return false;
+    
+    // Fuzzy token matching search
+    if (normalizedQuery) {
+      const tokens = normalizedQuery.split(/\s+/);
+      const searchString = `${game.title} ${game.developer || ""} ${game.publisher || ""} ${game.genres || ""}`.toLowerCase();
+      const matchesAll = tokens.every((token) => searchString.includes(token));
+      if (!matchesAll) return false;
+    }
+
+    if (!showHiddenGames && game.isHidden) return false;
+    
+    // Playtime filtering
+    if (playtimeFilter !== "all") {
+      const hrs = game.playtimeSeconds / 3600;
+      if (playtimeFilter === "short" && hrs >= 10) return false;
+      if (playtimeFilter === "medium" && (hrs < 10 || hrs > 100)) return false;
+      if (playtimeFilter === "long" && hrs <= 100) return false;
+    }
+
+    // Genre filtering
+    if (selectedGenreFilter !== "all") {
+      if (!game.genres || !game.genres.toLowerCase().includes(selectedGenreFilter.toLowerCase())) return false;
+    }
+
+    if (selectedCollectionId !== null) {
+      const collection = library.collections.find((c) => c.id === selectedCollectionId);
+      if (collection) {
+        if (collection.rules) {
+          return matchSmartRules(game, collection.rules);
+        } else {
+          return collectionGameIds.includes(game.id);
+        }
+      }
+    }
+    return true;
+  });
 
   // Apply sorting
   const sortedGames = [...filteredGames].sort((a, b) => {
@@ -108,6 +495,8 @@ export function LibraryPage({
     }
     return a.title.localeCompare(b.title);
   });
+
+  const visibleGames = sortedGames.slice(0, renderedCount);
 
   // Calculate Recently Played (Continue Playing)
   const recentlyPlayed = [...library.games]
@@ -273,7 +662,12 @@ export function LibraryPage({
   }
 
   return (
-    <main className={`min-h-screen bg-zinc-950 text-zinc-100 ${isBigPicture ? "bg-[radial-gradient(circle_at_top,#1c2317,#09090b_60%)]" : ""}`}>
+    <main
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`min-h-screen bg-zinc-950 text-zinc-100 relative ${isBigPicture ? "bg-[radial-gradient(circle_at_top,#1c2317,#09090b_60%)]" : ""}`}
+    >
       <div className={`mx-auto grid min-h-screen max-w-[1600px] ${isBigPicture ? "grid-cols-[300px_1fr]" : "grid-cols-[240px_1fr]"}`}>
         
         {/* Sidebar Nav */}
@@ -296,10 +690,11 @@ export function LibraryPage({
                   key={item}
                   onClick={() => {
                     setActiveTab(item);
+                    setSelectedCollectionId(null);
                     sounds.playConfirm();
                   }}
                   className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition focus:outline-2 focus:outline-offset-2 focus:outline-[var(--accent)] ${
-                    activeTab === item && selectedPlatform === "all"
+                    activeTab === item && selectedPlatform === "all" && selectedCollectionId === null
                       ? "bg-white/10 font-bold text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
                       : "text-zinc-400 hover:bg-white/5 hover:text-white"
                   }`}
@@ -326,10 +721,11 @@ export function LibraryPage({
                       onClick={() => {
                         setSelectedPlatform(plat.id);
                         setActiveTab("Library");
+                        setSelectedCollectionId(null);
                         sounds.playConfirm();
                       }}
                       className={`w-full flex justify-between items-center rounded-xl px-4 py-2 text-left text-xs transition ${
-                        selectedPlatform === plat.id && activeTab === "Library"
+                        selectedPlatform === plat.id && activeTab === "Library" && selectedCollectionId === null
                           ? "bg-white/10 font-bold text-white"
                           : "text-zinc-400 hover:bg-white/5 hover:text-white"
                       }`}
@@ -351,14 +747,14 @@ export function LibraryPage({
                 <input
                   {...focusProps}
                   aria-label="New collection name"
-                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-xs outline-none placeholder:text-zinc-600 focus:border-[var(--accent)]"
+                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-xs outline-none placeholder:text-zinc-600 focus:border-[var(--accent)] text-white"
                   onChange={(event) => setCollectionName(event.target.value)}
                   placeholder="New collection"
                   value={collectionName}
                 />
                 <button
                   {...focusProps}
-                  className="rounded-xl bg-white/10 px-3 text-sm hover:bg-white/15 disabled:opacity-50 font-bold animate-pulse-ring"
+                  className="rounded-xl bg-white/10 px-3 text-sm hover:bg-white/15 disabled:opacity-50 font-bold text-white"
                   disabled={isCreatingCollection}
                   type="submit"
                 >
@@ -366,12 +762,52 @@ export function LibraryPage({
                 </button>
               </form>
               <ul className="space-y-1">
-                {library.collections.map((collection) => (
-                  <li className="flex justify-between rounded-lg px-3 py-1.5 text-sm text-zinc-400" key={collection.id}>
-                    <span className="truncate">{collection.name}</span>
-                    <span className="text-xs text-zinc-600">{collection.gameCount}</span>
-                  </li>
-                ))}
+                {[...library.collections]
+                  .sort((a, b) => {
+                    if (a.isFavorite && !b.isFavorite) return -1;
+                    if (!a.isFavorite && b.isFavorite) return 1;
+                    return a.name.localeCompare(b.name);
+                  })
+                  .map((collection) => (
+                    <li
+                      className={`flex justify-between items-center rounded-xl px-3 py-1.5 text-xs transition ${
+                        selectedCollectionId === collection.id && activeTab === "Library"
+                          ? "bg-white/10 font-bold text-white"
+                          : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                      }`}
+                      key={collection.id}
+                    >
+                      <div className="flex items-center gap-2 truncate flex-1">
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await window.gameVault.setCollectionFavorite(collection.id, !collection.isFavorite);
+                            await refreshLibrary();
+                            sounds.playConfirm();
+                          }}
+                          className={`text-sm leading-none focus:outline-none transition-colors ${
+                            collection.isFavorite ? "text-[var(--accent)]" : "text-zinc-600 hover:text-zinc-400"
+                          }`}
+                        >
+                          ★
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCollectionClick(collection.id)}
+                          className="truncate text-left flex-1"
+                        >
+                          {collection.name}
+                          {collection.rules && (
+                            <span className="ml-1 rounded bg-[var(--accent-glow)] px-1 py-0.5 text-[8px] text-[var(--accent)] font-bold">Smart</span>
+                          )}
+                        </button>
+                      </div>
+                      <span className="rounded bg-zinc-950/60 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500 shrink-0">
+                        {collection.gameCount}
+                      </span>
+                    </li>
+                  ))}
               </ul>
             </div>
           </div>
@@ -566,6 +1002,36 @@ export function LibraryPage({
                     </select>
                   </div>
 
+                  {/* Playtime Filter */}
+                  <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900 px-3 py-1">
+                    <Clock className="size-4 text-zinc-500" />
+                    <select
+                      className="bg-transparent text-sm py-1.5 outline-none text-zinc-300 font-semibold cursor-pointer border-none"
+                      value={playtimeFilter}
+                      onChange={(e) => setPlaytimeFilter(e.target.value as any)}
+                    >
+                      <option value="all" className="bg-zinc-900">All Playtimes</option>
+                      <option value="short" className="bg-zinc-900">&lt; 10 Hours</option>
+                      <option value="medium" className="bg-zinc-900">10 - 100 Hours</option>
+                      <option value="long" className="bg-zinc-900">&gt; 100 Hours</option>
+                    </select>
+                  </div>
+
+                  {/* Genre Filter */}
+                  <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900 px-3 py-1">
+                    <Tag className="size-4 text-zinc-500" />
+                    <select
+                      className="bg-transparent text-sm py-1.5 outline-none text-zinc-300 font-semibold cursor-pointer border-none"
+                      value={selectedGenreFilter}
+                      onChange={(e) => setSelectedGenreFilter(e.target.value)}
+                    >
+                      <option value="all" className="bg-zinc-900">All Genres</option>
+                      {allGenres.map((genre) => (
+                        <option key={genre} value={genre} className="bg-zinc-900">{genre}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Grid/List View Toggles */}
                   <div className="flex border border-white/10 rounded-xl overflow-hidden">
                     <button
@@ -596,6 +1062,16 @@ export function LibraryPage({
                     <RefreshCw className="size-4" /> Sync Clients
                   </button>
 
+                  {/* Add Game Manually Button */}
+                  <button
+                    {...focusProps}
+                    className="flex items-center gap-2 rounded-xl bg-zinc-900 border border-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-zinc-800 text-zinc-300 transition"
+                    onClick={() => setIsManualAddOpen(true)}
+                    type="button"
+                  >
+                    <FolderPlus className="size-4" /> Add Game
+                  </button>
+
                   {/* Import Folder Button */}
                   <button
                     {...focusProps}
@@ -615,93 +1091,165 @@ export function LibraryPage({
                   </div>
                 ) : viewMode === "grid" ? (
                   /* GRID VIEW */
-                  <ul className={`grid gap-5 ${isBigPicture ? "grid-cols-4" : "grid-cols-3"}`}>
-                    {sortedGames.map((game) => (
-                      <li key={game.id}>
-                        <button
-                          {...focusProps}
-                          className="w-full flex flex-col rounded-3xl border border-white/10 bg-white/[0.02] overflow-hidden text-left hover:scale-[1.03] focus:scale-[1.03] focus:border-[var(--accent)] focus:outline-none transition group relative"
-                          onClick={() => setSelectedGameId(game.id)}
-                          type="button"
-                        >
-                          {/* Platform Badge overlay */}
-                          <div className="absolute top-3 left-3 z-10">
-                            <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider badge-${game.platform}`}>
-                              {platformLabels[game.platform]}
-                            </span>
-                          </div>
+                  <div className="space-y-6">
+                    <ul className={`grid gap-5 ${isBigPicture ? "grid-cols-4" : "grid-cols-3"}`}>
+                      {visibleGames.map((game, idx) => (
+                        <li key={game.id}>
+                          <button
+                            {...focusProps}
+                            className={`w-full flex flex-col rounded-3xl border overflow-hidden text-left hover:scale-[1.03] focus:scale-[1.03] focus:outline-none transition group relative ${
+                              focusedGameIndex === idx
+                                ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30 bg-white/[0.04]"
+                                : "border-white/10 bg-white/[0.02] hover:border-[var(--accent)]"
+                            }`}
+                            onClick={() => {
+                              if (selectedGameIds.length > 0) {
+                                // In selection mode, clicking toggles selection rather than details
+                                if (selectedGameIds.includes(game.id)) {
+                                  setSelectedGameIds((prev) => prev.filter((id) => id !== game.id));
+                                } else {
+                                  setSelectedGameIds((prev) => [...prev, game.id]);
+                                }
+                              } else {
+                                setSelectedGameId(game.id);
+                              }
+                            }}
+                            type="button"
+                          >
+                            {/* Platform Badge overlay */}
+                            <div className="absolute top-3 left-3 z-10">
+                              <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider badge-${game.platform}`}>
+                                {platformLabels[game.platform]}
+                              </span>
+                            </div>
 
-                          {/* Card cover image */}
-                          <div className="h-44 w-full bg-zinc-900 relative flex items-center justify-center text-4xl select-none">
-                            {game.coverPath && game.coverPath.startsWith("http") || game.coverPath?.includes("/") ? (
-                              <img src={game.coverPath} alt={game.title} className="size-full object-cover" />
-                            ) : (
-                              "🎮"
-                            )}
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 group-focus:opacity-100 flex items-center justify-center transition">
-                              <div className="rounded-full bg-[var(--accent)] p-3 text-zinc-950 shadow-md">
-                                <Play className="size-5 fill-zinc-950" />
+                            {/* Multi-select checkmark */}
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className={`absolute top-3 right-3 z-20 transition-opacity duration-200 ${
+                                selectedGameIds.length > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedGameIds.includes(game.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedGameIds((prev) => [...prev, game.id]);
+                                  } else {
+                                    setSelectedGameIds((prev) => prev.filter((id) => id !== game.id));
+                                  }
+                                }}
+                                className="size-4 cursor-pointer accent-[var(--accent)]"
+                              />
+                            </div>
+
+                            {/* Card cover image */}
+                            <div className="h-44 w-full bg-zinc-900 relative flex items-center justify-center text-4xl select-none">
+                              {game.coverPath && (game.coverPath.startsWith("http") || game.coverPath.includes("/")) ? (
+                                <img src={game.coverPath} alt={game.title} loading="lazy" className="size-full object-cover" />
+                              ) : (
+                                "🎮"
+                              )}
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 group-focus:opacity-100 flex items-center justify-center transition">
+                                <div className="rounded-full bg-[var(--accent)] p-3 text-zinc-950 shadow-md">
+                                  <Play className="size-5 fill-zinc-950" />
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Card Text info */}
-                          <div className="p-5 flex-1 flex flex-col justify-between">
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="font-bold truncate text-white">{game.title}</p>
+                            {/* Card Text info */}
+                            <div className="p-5 flex-1 flex flex-col justify-between">
+                              <div className="flex items-start justify-between gap-3">
+                                <p className="font-bold truncate text-white">{game.title}</p>
+                                <button
+                                  onClick={(e) => handleFavorite(e, game)}
+                                  className={`text-sm ${game.isFavorite ? "text-[var(--accent)]" : "text-zinc-600 hover:text-zinc-400"}`}
+                                  type="button"
+                                >
+                                  ★
+                                </button>
+                              </div>
+                              <p className="mt-2 text-xs text-zinc-500 font-medium">
+                                Playtime: {formatPlaytime(game.playtimeSeconds)}
+                              </p>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <div ref={sentinelRef} className="h-10 w-full flex items-center justify-center text-xs text-zinc-600 font-medium">
+                      {renderedCount < sortedGames.length ? "Loading more games..." : `Showing all ${sortedGames.length} games`}
+                    </div>
+                  </div>
+                ) : (
+                  /* LIST VIEW */
+                  <div className="space-y-6">
+                    <ul className="border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/10 bg-white/[0.01]">
+                      {visibleGames.map((game, idx) => (
+                        <li key={game.id}>
+                          <div
+                            className={`w-full px-6 py-4 flex items-center justify-between hover:bg-white/[0.04] text-left transition ${
+                              focusedGameIndex === idx ? "bg-white/[0.06] border-l-4 border-l-[var(--accent)]" : "border-l-4 border-l-transparent"
+                            }`}
+                          >
+                            <div className="flex items-center gap-4 min-w-0 flex-1">
+                              <input
+                                type="checkbox"
+                                checked={selectedGameIds.includes(game.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedGameIds((prev) => [...prev, game.id]);
+                                  } else {
+                                    setSelectedGameIds((prev) => prev.filter((id) => id !== game.id));
+                                  }
+                                }}
+                                className="size-4 cursor-pointer accent-[var(--accent)] shrink-0 mr-1"
+                              />
+                              <button
+                                onClick={() => {
+                                  if (selectedGameIds.length > 0) {
+                                    if (selectedGameIds.includes(game.id)) {
+                                      setSelectedGameIds((prev) => prev.filter((id) => id !== game.id));
+                                    } else {
+                                      setSelectedGameIds((prev) => [...prev, game.id]);
+                                    }
+                                  } else {
+                                    setSelectedGameId(game.id);
+                                  }
+                                }}
+                                className="flex items-center gap-4 min-w-0 text-left flex-1"
+                              >
+                                <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider badge-${game.platform} shrink-0`}>
+                                  {platformLabels[game.platform]}
+                                </span>
+                                <div className="truncate">
+                                  <p className="font-bold text-white truncate">{game.title}</p>
+                                  <p className="text-[10px] text-zinc-500 truncate">{game.executablePath}</p>
+                                </div>
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-6 shrink-0">
+                              <span className="text-xs text-zinc-400 font-mono">
+                                Playtime: <strong>{formatPlaytime(game.playtimeSeconds)}</strong>
+                              </span>
                               <button
                                 onClick={(e) => handleFavorite(e, game)}
-                                className={`text-sm ${game.isFavorite ? "text-[var(--accent)]" : "text-zinc-600 hover:text-zinc-400"}`}
+                                className={`text-lg ${game.isFavorite ? "text-[var(--accent)]" : "text-zinc-600 hover:text-zinc-400"}`}
                                 type="button"
                               >
                                 ★
                               </button>
                             </div>
-                            <p className="mt-2 text-xs text-zinc-500 font-medium">
-                              Playtime: {formatPlaytime(game.playtimeSeconds)}
-                            </p>
                           </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  /* LIST VIEW */
-                  <ul className="border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/10 bg-white/[0.01]">
-                    {sortedGames.map((game) => (
-                      <li key={game.id}>
-                        <button
-                          {...focusProps}
-                          onClick={() => setSelectedGameId(game.id)}
-                          className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/[0.04] text-left transition"
-                          type="button"
-                        >
-                          <div className="flex items-center gap-4 min-w-0">
-                            <span className={`px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider badge-${game.platform} shrink-0`}>
-                              {platformLabels[game.platform]}
-                            </span>
-                            <div className="truncate">
-                              <p className="font-bold text-white truncate">{game.title}</p>
-                              <p className="text-[10px] text-zinc-500 truncate">{game.executablePath}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-6 shrink-0">
-                            <span className="text-xs text-zinc-400">
-                              Playtime: <strong>{formatPlaytime(game.playtimeSeconds)}</strong>
-                            </span>
-                            <button
-                              onClick={(e) => handleFavorite(e, game)}
-                              className={`text-lg ${game.isFavorite ? "text-[var(--accent)]" : "text-zinc-600"}`}
-                              type="button"
-                            >
-                              ★
-                            </button>
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                        </li>
+                      ))}
+                    </ul>
+                    <div ref={sentinelRef} className="h-10 w-full flex items-center justify-center text-xs text-zinc-600 font-medium">
+                      {renderedCount < sortedGames.length ? "Loading more games..." : `Showing all ${sortedGames.length} games`}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -716,12 +1264,85 @@ export function LibraryPage({
                       No collections created yet. Use the sidebar input to create custom lists.
                     </div>
                   ) : (
-                    library.collections.map((col) => (
-                      <div key={col.id} className="rounded-3xl border border-white/5 bg-white/[0.02] p-6 space-y-2">
-                        <h4 className="font-extrabold text-lg text-white">{col.name}</h4>
-                        <p className="text-xs text-zinc-500 font-medium">{col.gameCount} games categorized</p>
-                      </div>
-                    ))
+                    library.collections.map((col) => {
+                      let parsedRules = [];
+                      if (col.rules) {
+                        try {
+                          parsedRules = JSON.parse(col.rules);
+                        } catch {}
+                      }
+
+                      return (
+                        <div key={col.id} className="rounded-3xl border border-white/5 bg-white/[0.02] p-6 flex flex-col justify-between space-y-4">
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-start">
+                              <h4 className="font-extrabold text-lg text-white">{col.name}</h4>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await window.gameVault.setCollectionFavorite(col.id, !col.isFavorite);
+                                  await refreshLibrary();
+                                  sounds.playConfirm();
+                                }}
+                                className={`text-sm leading-none focus:outline-none transition-colors ${
+                                  col.isFavorite ? "text-[var(--accent)]" : "text-zinc-600 hover:text-zinc-400"
+                                }`}
+                              >
+                                ★
+                              </button>
+                            </div>
+                            <p className="text-xs text-zinc-500 font-medium">{col.gameCount} games categorized</p>
+                            {parsedRules.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Smart Rules:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {parsedRules.map((rule: any, idx: number) => (
+                                    <span key={idx} className="rounded bg-zinc-900 border border-white/5 px-2 py-0.5 text-[9px] text-zinc-400">
+                                      {rule.field === "genres" ? "Genre" : rule.field === "platform" ? "Platform" : "Dev"}: {rule.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleCollectionClick(col.id)}
+                              className="flex-1 text-center rounded-xl bg-white/5 py-2 text-xs font-semibold hover:bg-white/10 text-white transition"
+                            >
+                              View Games
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCollectionId(col.id);
+                                let genreVal = "";
+                                let platVal = "all";
+                                let devVal = "";
+                                if (col.rules) {
+                                  try {
+                                    const rules = JSON.parse(col.rules);
+                                    for (const r of rules) {
+                                      if (r.field === "genres") genreVal = r.value;
+                                      if (r.field === "platform") platVal = r.value;
+                                      if (r.field === "developer") devVal = r.value;
+                                    }
+                                  } catch {}
+                                }
+                                setSmartGenre(genreVal);
+                                setSmartPlatform(platVal);
+                                setSmartDeveloper(devVal);
+                                sounds.playConfirm();
+                              }}
+                              className="text-center rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 py-2 px-3 text-xs font-semibold hover:bg-[var(--accent)]/20 text-[var(--accent)] transition"
+                            >
+                              Edit Rules
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -732,7 +1353,90 @@ export function LibraryPage({
               <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-6">
                   {/* Interface settings */}
-                  <CustomizationSettings profile={profile} onUpdateSettings={onUpdateSettings} />
+                  <CustomizationSettings profile={profile} onUpdateSettings={handleUpdateSettingsWithHistory} />
+
+                  {/* Library Preferences Card */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <LibIcon className="size-5 text-[var(--accent)]" /> Library Preferences
+                    </h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Configure visibility and options for your local games library.
+                    </p>
+                    
+                    <label className="flex items-center justify-between gap-4 rounded-xl bg-zinc-950 p-4 cursor-pointer border border-white/5 hover:bg-zinc-900 transition">
+                      <div>
+                        <span className="text-sm font-semibold block">Show Hidden Games</span>
+                        <span className="text-[10px] text-zinc-500">Display games marked as hidden in your library pages.</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={showHiddenGames}
+                        onChange={(e) => setShowHiddenGames(e.target.checked)}
+                        className="accent-[var(--accent)] size-4 cursor-pointer"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Library Backup & Restoration Card */}
+                  <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Save className="size-5 text-[var(--accent)]" /> Backup & Restoration
+                    </h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Export configurations or perform full database backups to prevent data loss.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <button
+                        onClick={async () => {
+                          const res = await window.gameVault.exportSettings();
+                          if (res) showToast("Configurations exported", "success");
+                        }}
+                        className="rounded-xl bg-zinc-950 border border-white/5 p-3 hover:bg-zinc-900 text-left transition"
+                        type="button"
+                      >
+                        <span className="text-xs font-bold block text-white">Export Settings</span>
+                        <span className="text-[9px] text-zinc-500">Save collections and profile configs.</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const res = await window.gameVault.importSettings();
+                          if (res) {
+                            await refreshLibrary();
+                            showToast("Configurations imported", "success");
+                          }
+                        }}
+                        className="rounded-xl bg-zinc-950 border border-white/5 p-3 hover:bg-zinc-900 text-left transition"
+                        type="button"
+                      >
+                        <span className="text-xs font-bold block text-white">Import Settings</span>
+                        <span className="text-[9px] text-zinc-500">Load profile configs from file.</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const res = await window.gameVault.createDbBackup();
+                          if (res) showToast("Database backup created", "success");
+                        }}
+                        className="rounded-xl bg-zinc-950 border border-white/5 p-3 hover:bg-zinc-900 text-left transition"
+                        type="button"
+                      >
+                        <span className="text-xs font-bold block text-white">Create DB Backup</span>
+                        <span className="text-[9px] text-zinc-500">Copy database file to custom path.</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const confirmed = confirm("Restoring database backup will overwrite existing games database and restart the application. Proceed?");
+                          if (!confirmed) return;
+                          await window.gameVault.restoreDbBackup();
+                        }}
+                        className="rounded-xl bg-red-950/20 border border-red-500/20 p-3 hover:bg-red-950/40 text-left transition"
+                        type="button"
+                      >
+                        <span className="text-xs font-bold block text-red-200">Restore DB Backup</span>
+                        <span className="text-[9px] text-red-400">Restore SQLite db (app restarts).</span>
+                      </button>
+                    </div>
+                  </div>
 
                   {/* Sandbox / Demo Modes Card */}
                   <div className="rounded-3xl border border-white/10 bg-zinc-900/40 p-6 space-y-4">
@@ -926,6 +1630,277 @@ export function LibraryPage({
         />
       )}
 
+      {/* Drag Over Overlay */}
+      {dragOver && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--accent-glow)]/90 backdrop-blur-md border-4 border-dashed border-[var(--accent)] animate-pulse">
+          <FolderPlus className="size-20 text-[var(--accent)] mb-4" />
+          <h2 className="text-3xl font-black text-white">Drop Game Files Here</h2>
+          <p className="text-sm text-zinc-300 mt-2">Release files to scan and add them directly to your library.</p>
+        </div>
+      )}
+
+      {/* Manual Add Game Modal */}
+      {isManualAddOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-zinc-900 p-6 space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold">Add Game Manually</h3>
+              <button onClick={() => setIsManualAddOpen(false)} className="text-zinc-500 hover:text-white text-2xl" type="button">&times;</button>
+            </div>
+            <form onSubmit={handleManualAddSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold uppercase text-zinc-400">Game Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={manualTitle}
+                  onChange={(e) => setManualTitle(e.target.value)}
+                  className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                  placeholder="E.g. Super Meat Boy"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase text-zinc-400">Executable Path (Optional)</label>
+                <div className="flex gap-2 mt-1.5">
+                  <input
+                    type="text"
+                    value={manualPath}
+                    onChange={(e) => setManualPath(e.target.value)}
+                    className="flex-1 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-xs font-mono outline-none focus:border-[var(--accent)] text-white"
+                    placeholder="E.g. /Applications/SuperMeatBoy.app"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const selected = await window.gameVault.selectDirectory();
+                      if (selected) setManualPath(selected);
+                    }}
+                    className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15 text-white"
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-zinc-400">Developer</label>
+                  <input
+                    type="text"
+                    value={manualDev}
+                    onChange={(e) => setManualDev(e.target.value)}
+                    className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-zinc-400">Publisher</label>
+                  <input
+                    type="text"
+                    value={manualPub}
+                    onChange={(e) => setManualPub(e.target.value)}
+                    className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-zinc-400">Genres (Comma separated)</label>
+                  <input
+                    type="text"
+                    value={manualGenres}
+                    onChange={(e) => setManualGenres(e.target.value)}
+                    className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                    placeholder="Action, Platformer"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-zinc-400">Release Date</label>
+                  <input
+                    type="text"
+                    value={manualRelDate}
+                    onChange={(e) => setManualRelDate(e.target.value)}
+                    className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                    placeholder="Oct 2010"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase text-zinc-400">Cover Artwork URL / Path</label>
+                <input
+                  type="text"
+                  value={manualCover}
+                  onChange={(e) => setManualCover(e.target.value)}
+                  className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                  placeholder="HTTPS URL or local absolute path"
+                />
+              </div>
+              <div className="flex justify-end gap-3 border-t border-white/10 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsManualAddOpen(false)}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-400 hover:bg-white/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-bold text-zinc-950 hover:bg-[var(--accent-hover)] transition"
+                >
+                  Add to Library
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Confirmation Modal */}
+      {duplicateConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900 p-6 space-y-6">
+            <h3 className="text-xl font-bold text-yellow-500">Duplicate Game Detected</h3>
+            <p className="text-sm text-zinc-300">
+              A game with the title <strong>"{duplicateConfirm.title}"</strong> or executable path is already in your library.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={async () => {
+                  const updatedMetadata = {
+                    title: pendingImport!.title,
+                    executablePath: pendingImport!.path,
+                    developer: pendingImport!.developer,
+                    publisher: pendingImport!.publisher,
+                    genres: pendingImport!.genres,
+                    releaseDate: pendingImport!.releaseDate,
+                    coverPath: pendingImport!.coverPath,
+                    description: pendingImport!.description
+                  };
+                  await window.gameVault.updateGameMetadata(duplicateConfirm.id, updatedMetadata);
+                  await refreshLibrary();
+                  setDuplicateConfirm(null);
+                  setPendingImport(null);
+                  setIsManualAddOpen(false);
+                  sounds.playConfirm();
+                }}
+                className="w-full rounded-xl bg-yellow-500 px-4 py-2.5 text-sm font-bold text-zinc-950 hover:bg-yellow-400 transition text-center"
+                type="button"
+              >
+                Overwrite Existing Game
+              </button>
+              <button
+                onClick={async () => {
+                  const path = pendingImport!.path || `manual://game-${Date.now()}`;
+                  await window.gameVault.addGame(pendingImport!.title, path, "local", {
+                    developer: pendingImport!.developer,
+                    publisher: pendingImport!.publisher,
+                    genres: pendingImport!.genres,
+                    releaseDate: pendingImport!.releaseDate,
+                    coverPath: pendingImport!.coverPath,
+                    description: pendingImport!.description
+                  });
+                  await refreshLibrary();
+                  setDuplicateConfirm(null);
+                  setPendingImport(null);
+                  setIsManualAddOpen(false);
+                  sounds.playConfirm();
+                }}
+                className="w-full rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white hover:bg-white/15 transition text-center"
+                type="button"
+              >
+                Add as Duplicate Game
+              </button>
+              <button
+                onClick={() => {
+                  setDuplicateConfirm(null);
+                  setPendingImport(null);
+                }}
+                className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-sm font-bold text-zinc-400 hover:bg-white/5 transition text-center"
+                type="button"
+              >
+                Cancel Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Smart Rules Editor Modal */}
+      {editingCollectionId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900 p-6 space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold">Configure Smart Collection</h3>
+              <button onClick={() => setEditingCollectionId(null)} className="text-zinc-500 hover:text-white text-2xl" type="button">&times;</button>
+            </div>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Define filter criteria. Games matching these fields will automatically be populated in this smart collection.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold uppercase text-zinc-500">Genre Contains</label>
+                <input
+                  type="text"
+                  value={smartGenre}
+                  onChange={(e) => setSmartGenre(e.target.value)}
+                  className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                  placeholder="E.g. RPG, Action"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase text-zinc-500">Platform equals</label>
+                <select
+                  value={smartPlatform}
+                  onChange={(e) => setSmartPlatform(e.target.value)}
+                  className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                >
+                  <option value="all">Any Platform</option>
+                  <option value="steam">Steam</option>
+                  <option value="epic">Epic Games</option>
+                  <option value="gog">GOG Galaxy</option>
+                  <option value="local">Local</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase text-zinc-500">Developer Contains</label>
+                <input
+                  type="text"
+                  value={smartDeveloper}
+                  onChange={(e) => setSmartDeveloper(e.target.value)}
+                  className="w-full mt-1.5 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                  placeholder="E.g. Valve, Supergiant"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-white/10 pt-4">
+              <button
+                type="button"
+                onClick={() => setEditingCollectionId(null)}
+                className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-400 hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const rules = [];
+                  if (smartGenre.trim()) rules.push({ field: "genres", value: smartGenre.trim() });
+                  if (smartPlatform !== "all") rules.push({ field: "platform", value: smartPlatform });
+                  if (smartDeveloper.trim()) rules.push({ field: "developer", value: smartDeveloper.trim() });
+                  
+                  const rulesStr = rules.length > 0 ? JSON.stringify(rules) : null;
+                  await window.gameVault.updateCollectionRules(editingCollectionId, rulesStr);
+                  await refreshLibrary();
+                  setEditingCollectionId(null);
+                  sounds.playConfirm();
+                }}
+                className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-bold text-zinc-950 hover:bg-[var(--accent-hover)] transition"
+              >
+                Save Smart Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Game Details Overlay Page */}
       {selectedGameId !== null && (
         <GameDetailsPage
@@ -934,8 +1909,120 @@ export function LibraryPage({
           onClose={() => setSelectedGameId(null)}
           onLaunch={handleLaunchGame}
           onUpdateMetadata={handleUpdateMetadata}
+          onRemoveGame={handleRemoveGame}
         />
       )}
+      {/* Bulk / Multi-select Action Bar */}
+      {selectedGameIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-2xl bg-zinc-900/95 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 animate-slide-up">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-[var(--accent)] px-2.5 py-1 text-xs font-black text-zinc-950">
+              {selectedGameIds.length}
+            </span>
+            <span className="text-xs text-zinc-300 font-semibold">Games Selected</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                for (const id of selectedGameIds) {
+                  await window.gameVault.setGameFavorite(id, true);
+                }
+                await refreshLibrary();
+                setSelectedGameIds([]);
+                showToast(`Favorited ${selectedGameIds.length} games`, "success");
+                sounds.playConfirm();
+              }}
+              className="rounded-xl bg-zinc-800 border border-white/5 hover:bg-zinc-700 px-3 py-2 text-xs font-semibold text-white transition"
+              type="button"
+            >
+              ★ Favorite
+            </button>
+            <button
+              onClick={async () => {
+                for (const id of selectedGameIds) {
+                  await window.gameVault.setGameHidden(id, true);
+                }
+                await refreshLibrary();
+                setSelectedGameIds([]);
+                showToast(`Hid ${selectedGameIds.length} games`, "success");
+                sounds.playConfirm();
+              }}
+              className="rounded-xl bg-zinc-800 border border-white/5 hover:bg-zinc-700 px-3 py-2 text-xs font-semibold text-white transition"
+              type="button"
+            >
+              Hide
+            </button>
+            <button
+              onClick={async () => {
+                const confirmed = confirm(`Are you sure you want to delete ${selectedGameIds.length} games from library?`);
+                if (!confirmed) return;
+                for (const id of selectedGameIds) {
+                  await window.gameVault.deleteGame(id);
+                }
+                await refreshLibrary();
+                setSelectedGameIds([]);
+                showToast(`Deleted ${selectedGameIds.length} games`, "warning");
+                sounds.playConfirm();
+              }}
+              className="rounded-xl bg-red-950/40 border border-red-500/20 hover:bg-red-900 px-3 py-2 text-xs font-semibold text-red-200 transition"
+              type="button"
+            >
+              Delete
+            </button>
+            
+            <select
+              defaultValue=""
+              onChange={async (e) => {
+                const colId = Number(e.target.value);
+                if (!colId) return;
+                for (const id of selectedGameIds) {
+                  await window.gameVault.addGameToCollection(colId, id);
+                }
+                await refreshLibrary();
+                setSelectedGameIds([]);
+                showToast(`Added selectees to collection`, "success");
+                sounds.playConfirm();
+              }}
+              className="rounded-xl bg-zinc-800 border border-white/5 text-xs font-semibold px-2 py-2 text-white outline-none cursor-pointer"
+            >
+              <option value="" disabled>Add to collection...</option>
+              {library.collections.map((col) => (
+                <option key={col.id} value={col.id}>{col.name}</option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setSelectedGameIds([])}
+              className="rounded-xl border border-white/10 hover:bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition"
+              type="button"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Alert overlay */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`pointer-events-auto rounded-2xl border px-4 py-3 text-xs font-semibold text-white shadow-xl flex items-center gap-3 transition-all duration-300 transform translate-y-0 scale-100 ${
+              toast.type === "success"
+                ? "bg-zinc-950/90 border-green-500/30 text-green-200"
+                : toast.type === "warning"
+                ? "bg-zinc-950/90 border-red-500/30 text-red-200"
+                : "bg-zinc-950/90 border-white/10 text-zinc-100"
+            }`}
+          >
+            <div className={`size-2 rounded-full animate-pulse ${
+              toast.type === "success" ? "bg-green-400" : toast.type === "warning" ? "bg-red-400" : "bg-[var(--accent)]"
+            }`} />
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div>
     </main>
   );
 }

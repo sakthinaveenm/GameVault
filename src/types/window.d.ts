@@ -13,6 +13,21 @@ declare global {
       chooseAndImportGames: () => Promise<{ canceled: boolean; imported: number }>;
       setGameFavorite: (gameId: number, isFavorite: boolean) => Promise<void>;
       createCollection: (name: string) => Promise<Collection>;
+      addGame: (title: string, executablePath: string, platform?: string, metadata?: any) => Promise<number>;
+      deleteGame: (gameId: number) => Promise<void>;
+      setGameHidden: (gameId: number, isHidden: boolean) => Promise<void>;
+      setCollectionFavorite: (collectionId: number, isFavorite: boolean) => Promise<void>;
+      getLaunchHistory: (gameId: number) => Promise<Array<{ id: number; gameId: number; launchedAt: string; durationSeconds: number }>>;
+      updateCollectionRules: (collectionId: number, rules: string | null) => Promise<void>;
+      addGameToCollection: (collectionId: number, gameId: number) => Promise<void>;
+      removeGameFromCollection: (collectionId: number, gameId: number) => Promise<void>;
+      getCollectionGames: (collectionId: number) => Promise<number[]>;
+      triggerBackgroundMetadata: () => Promise<void>;
+      triggerSingleGameMetadata: (gameId: number, title: string) => Promise<boolean>;
+      exportSettings: () => Promise<boolean>;
+      importSettings: () => Promise<boolean>;
+      createDbBackup: () => Promise<boolean>;
+      restoreDbBackup: () => Promise<boolean>;
       
       // Profile & Settings
       getProfile: () => Promise<Profile>;

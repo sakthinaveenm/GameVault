@@ -31,14 +31,29 @@ export function launchGame(database: Database, gameId: number): void {
 
   if (game.platform === "local") {
     const isMacApp = process.platform === "darwin" && game.executablePath.endsWith(".app");
+    
+    // Parse launch arguments
+    const args: string[] = [];
+    if (game.launchArguments) {
+      const regex = /"([^"]*)"|'([^']*)'|(\S+)/g;
+      let matches;
+      while ((matches = regex.exec(game.launchArguments)) !== null) {
+        args.push(matches[1] || matches[2] || matches[3]);
+      }
+    }
+
     let child;
 
     if (isMacApp) {
       // On macOS, open -W waits for the app to terminate
-      child = spawn("open", ["-W", game.executablePath]);
+      const openArgs = ["-W", game.executablePath];
+      if (args.length > 0) {
+        openArgs.push("--args", ...args);
+      }
+      child = spawn("open", openArgs);
     } else {
       // Run the executable directly
-      child = spawn(game.executablePath, [], {
+      child = spawn(game.executablePath, args, {
         detached: true,
         stdio: "ignore",
       });
@@ -58,6 +73,7 @@ export function launchGame(database: Database, gameId: number): void {
         const durationSeconds = Math.round((Date.now() - startTime) / 1000);
         if (durationSeconds > 0) {
           database.incrementPlaytime(gameId, durationSeconds);
+          database.recordLaunchSession(gameId, durationSeconds);
         }
         activeSession = null;
         sendGameStatus(gameId, "stopped", durationSeconds);
@@ -124,6 +140,7 @@ export function launchGame(database: Database, gameId: number): void {
               const durationSeconds = Math.round((Date.now() - startTime) / 1000);
               if (durationSeconds > 0) {
                 database.incrementPlaytime(gameId, durationSeconds);
+                database.recordLaunchSession(gameId, durationSeconds);
               }
               activeSession = null;
               sendGameStatus(gameId, "stopped", durationSeconds);

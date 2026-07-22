@@ -226,28 +226,28 @@ GameVault/
 
 ### Library Improvements
 
-* [ ] Manual game editor
-* [ ] Drag & drop game import
-* [ ] Duplicate game detection
-* [ ] Hidden games
-* [ ] Favorite collections
-* [ ] Smart collections (Auto-generated)
+* [x] Manual game editor
+* [x] Drag & drop game import
+* [x] Duplicate game detection
+* [x] Hidden games
+* [x] Favorite collections
+* [x] Smart collections (Auto-generated)
 
 ### Metadata
 
 * [ ] Automatic metadata refresh
-* [ ] Manual metadata refresh
-* [ ] Custom artwork support
+* [x] Manual metadata refresh
+* [x] Custom artwork support
 * [ ] Custom game logos
 * [ ] Custom hero banners
 * [ ] Multiple screenshot gallery
 
 ### Launcher
 
-* [ ] Launch arguments
-* [ ] Per-game launch options
-* [ ] Launch history
-* [ ] Exit game detection
+* [x] Launch arguments
+* [x] Per-game launch options
+* [x] Launch history
+* [x] Exit game detection
 
 ---
 
@@ -255,27 +255,27 @@ GameVault/
 
 ### Performance
 
-* [ ] Virtualized game library
-* [ ] Lazy image loading
-* [ ] Background metadata downloading
-* [ ] Improved database indexing
-* [ ] Faster startup (<2 seconds target)
+* [x] Virtualized game library
+* [x] Lazy image loading
+* [x] Background metadata downloading
+* [x] Improved database indexing
+* [x] Faster startup (<2 seconds target)
 
 ### User Experience
 
-* [ ] Undo/Redo settings
-* [ ] Notification system
-* [ ] Keyboard shortcuts
-* [ ] Improved search
-* [ ] Advanced filtering
-* [ ] Multi-select game actions
+* [x] Undo/Redo settings
+* [x] Notification system
+* [x] Keyboard shortcuts
+* [x] Improved search
+* [x] Advanced filtering
+* [x] Multi-select game actions
 
 ### Backup
 
-* [ ] Export settings
-* [ ] Import settings
-* [ ] Library backup
-* [ ] Restore backup
+* [x] Export settings
+* [x] Import settings
+* [x] Library backup
+* [x] Restore backup
 
 ---
 

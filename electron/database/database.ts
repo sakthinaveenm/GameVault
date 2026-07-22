@@ -17,6 +17,8 @@ export type Game = {
   releaseDate?: string | null;
   platform: string;
   platformGameId?: string | null;
+  launchArguments?: string | null;
+  isHidden?: boolean;
 };
 
 export type Profile = {
@@ -40,6 +42,8 @@ export type Collection = {
   id: number;
   name: string;
   gameCount: number;
+  isFavorite: boolean;
+  rules?: string | null;
 };
 
 const migrations = [
@@ -137,6 +141,33 @@ const migrations = [
       ALTER TABLE profiles ADD COLUMN steam_directory TEXT;
     `,
   },
+  {
+    version: 9,
+    name: "add_v1_1_columns_and_tables",
+    up: `
+      ALTER TABLE games ADD COLUMN launch_arguments TEXT;
+      ALTER TABLE games ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_hidden IN (0, 1));
+      ALTER TABLE collections ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0 CHECK (is_favorite IN (0, 1));
+      ALTER TABLE collections ADD COLUMN rules TEXT;
+      CREATE TABLE game_launches (
+        id INTEGER PRIMARY KEY,
+        game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        launched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        duration_seconds INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX idx_game_launches_game ON game_launches(game_id);
+    `,
+  },
+  {
+    version: 10,
+    name: "add_v1_2_performance_indices",
+    up: `
+      CREATE INDEX IF NOT EXISTS idx_games_platform ON games(platform);
+      CREATE INDEX IF NOT EXISTS idx_games_is_favorite ON games(is_favorite);
+      CREATE INDEX IF NOT EXISTS idx_games_is_hidden ON games(is_hidden);
+      CREATE INDEX IF NOT EXISTS idx_games_playtime ON games(playtime_seconds);
+    `,
+  },
 ] as const;
 
 export class Database {
@@ -156,6 +187,10 @@ export class Database {
 
   isReady(): boolean {
     return this.connection.open;
+  }
+
+  close(): void {
+    this.connection.close();
   }
 
   importGames(games: GameImport[]): number {
@@ -183,7 +218,7 @@ export class Database {
 
   getGames(): Game[] {
     const rows = this.connection.prepare(`
-      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite, description, cover_path, developer, publisher, genres, release_date, platform, platform_game_id
+      SELECT id, title, executable_path, installed_at, last_played_at, playtime_seconds, is_favorite, description, cover_path, developer, publisher, genres, release_date, platform, platform_game_id, launch_arguments, is_hidden
       FROM games
       ORDER BY title COLLATE NOCASE ASC
     `).all() as Array<{
@@ -202,6 +237,8 @@ export class Database {
       release_date: string | null;
       platform: string;
       platform_game_id: string | null;
+      launch_arguments: string | null;
+      is_hidden: number;
     }>;
 
     return rows.map((game) => ({
@@ -220,6 +257,8 @@ export class Database {
       releaseDate: game.release_date,
       platform: game.platform,
       platformGameId: game.platform_game_id,
+      launchArguments: game.launch_arguments,
+      isHidden: game.is_hidden === 1,
     }));
   }
 
@@ -281,14 +320,20 @@ export class Database {
 
   getCollections(): Collection[] {
     const rows = this.connection.prepare(`
-      SELECT collections.id, collections.name, COUNT(collection_games.game_id) AS game_count
+      SELECT collections.id, collections.name, collections.is_favorite, collections.rules, COUNT(collection_games.game_id) AS game_count
       FROM collections
       LEFT JOIN collection_games ON collection_games.collection_id = collections.id
       GROUP BY collections.id
       ORDER BY collections.name COLLATE NOCASE ASC
-    `).all() as Array<{ id: number; name: string; game_count: number }>;
+    `).all() as Array<{ id: number; name: string; is_favorite: number; rules: string | null; game_count: number }>;
 
-    return rows.map((collection) => ({ id: collection.id, name: collection.name, gameCount: collection.game_count }));
+    return rows.map((collection) => ({
+      id: collection.id,
+      name: collection.name,
+      gameCount: collection.game_count,
+      isFavorite: collection.is_favorite === 1,
+      rules: collection.rules,
+    }));
   }
 
   createCollection(name: string): Collection {
@@ -296,7 +341,7 @@ export class Database {
     if (trimmedName.length < 1 || trimmedName.length > 60) throw new Error("Collection names must be 1–60 characters.");
 
     const result = this.connection.prepare("INSERT INTO collections (name) VALUES (?)").run(trimmedName);
-    return { id: Number(result.lastInsertRowid), name: trimmedName, gameCount: 0 };
+    return { id: Number(result.lastInsertRowid), name: trimmedName, gameCount: 0, isFavorite: false };
   }
 
   getProfile(): Profile {
@@ -381,37 +426,148 @@ export class Database {
     this.connection.prepare("UPDATE games SET playtime_seconds = playtime_seconds + ? WHERE id = ?").run(seconds, gameId);
   }
 
+  addGame(
+    title: string,
+    executablePath: string,
+    platform: string = "local",
+    metadata: {
+      description?: string | null;
+      coverPath?: string | null;
+      developer?: string | null;
+      publisher?: string | null;
+      genres?: string | null;
+      releaseDate?: string | null;
+      launchArguments?: string | null;
+    } = {}
+  ): number {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) throw new Error("Game title is required.");
+
+    const result = this.connection.prepare(`
+      INSERT INTO games (title, executable_path, platform, description, cover_path, developer, publisher, genres, release_date, launch_arguments)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      trimmedTitle,
+      executablePath,
+      platform,
+      metadata.description || null,
+      metadata.coverPath || null,
+      metadata.developer || null,
+      metadata.publisher || null,
+      metadata.genres || null,
+      metadata.releaseDate || null,
+      metadata.launchArguments || null
+    );
+
+    return Number(result.lastInsertRowid);
+  }
+
+  deleteGame(gameId: number): void {
+    if (!Number.isSafeInteger(gameId) || gameId < 1) throw new Error("Invalid game ID.");
+    this.connection.prepare("DELETE FROM games WHERE id = ?").run(gameId);
+  }
+
+  setGameHidden(gameId: number, isHidden: boolean): void {
+    if (!Number.isSafeInteger(gameId) || gameId < 1) throw new Error("Invalid game ID.");
+    this.connection.prepare("UPDATE games SET is_hidden = ? WHERE id = ?").run(isHidden ? 1 : 0, gameId);
+  }
+
+  setCollectionFavorite(collectionId: number, isFavorite: boolean): void {
+    if (!Number.isSafeInteger(collectionId) || collectionId < 1) throw new Error("Invalid collection ID.");
+    this.connection.prepare("UPDATE collections SET is_favorite = ? WHERE id = ?").run(isFavorite ? 1 : 0, collectionId);
+  }
+
+  getLaunchHistory(gameId: number): Array<{ id: number; gameId: number; launchedAt: string; durationSeconds: number }> {
+    const rows = this.connection.prepare(`
+      SELECT id, game_id, launched_at, duration_seconds
+      FROM game_launches
+      WHERE game_id = ?
+      ORDER BY launched_at DESC
+    `).all(gameId) as Array<{
+      id: number;
+      game_id: number;
+      launched_at: string;
+      duration_seconds: number;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      gameId: row.game_id,
+      launchedAt: row.launched_at,
+      durationSeconds: row.duration_seconds,
+    }));
+  }
+
+  recordLaunchSession(gameId: number, durationSeconds: number): void {
+    if (!Number.isSafeInteger(gameId) || gameId < 1) throw new Error("Invalid game ID.");
+    if (durationSeconds < 0) return;
+    this.connection.prepare(`
+      INSERT INTO game_launches (game_id, duration_seconds, launched_at)
+      VALUES (?, ?, datetime('now', 'localtime'))
+    `).run(gameId, durationSeconds);
+  }
+
+  updateCollectionRules(collectionId: number, rules: string | null): void {
+    if (!Number.isSafeInteger(collectionId) || collectionId < 1) throw new Error("Invalid collection ID.");
+    this.connection.prepare("UPDATE collections SET rules = ? WHERE id = ?").run(rules, collectionId);
+  }
+
   updateGameMetadata(gameId: number, metadata: {
+    title?: string;
+    executablePath?: string;
     description?: string | null;
     coverPath?: string | null;
     developer?: string | null;
     publisher?: string | null;
     genres?: string | null;
     releaseDate?: string | null;
+    launchArguments?: string | null;
+    isHidden?: boolean;
   }): void {
     const current = this.connection.prepare(
-      "SELECT description, cover_path, developer, publisher, genres, release_date FROM games WHERE id = ?"
+      "SELECT title, executable_path, description, cover_path, developer, publisher, genres, release_date, launch_arguments, is_hidden FROM games WHERE id = ?"
     ).get(gameId) as any;
     if (!current) throw new Error("Game not found.");
 
     this.connection.prepare(`
       UPDATE games SET
+        title = ?,
+        executable_path = ?,
         description = ?,
         cover_path = ?,
         developer = ?,
         publisher = ?,
         genres = ?,
-        release_date = ?
+        release_date = ?,
+        launch_arguments = ?,
+        is_hidden = ?
       WHERE id = ?
     `).run(
+      metadata.title !== undefined ? metadata.title : current.title,
+      metadata.executablePath !== undefined ? metadata.executablePath : current.executable_path,
       metadata.description !== undefined ? metadata.description : current.description,
       metadata.coverPath !== undefined ? metadata.coverPath : current.cover_path,
       metadata.developer !== undefined ? metadata.developer : current.developer,
       metadata.publisher !== undefined ? metadata.publisher : current.publisher,
       metadata.genres !== undefined ? metadata.genres : current.genres,
       metadata.releaseDate !== undefined ? metadata.releaseDate : current.release_date,
+      metadata.launchArguments !== undefined ? metadata.launchArguments : current.launch_arguments,
+      metadata.isHidden !== undefined ? (metadata.isHidden ? 1 : 0) : current.is_hidden,
       gameId
     );
+  }
+
+  addGameToCollection(collectionId: number, gameId: number): void {
+    this.connection.prepare("INSERT OR IGNORE INTO collection_games (collection_id, game_id) VALUES (?, ?)").run(collectionId, gameId);
+  }
+
+  removeGameFromCollection(collectionId: number, gameId: number): void {
+    this.connection.prepare("DELETE FROM collection_games WHERE collection_id = ? AND game_id = ?").run(collectionId, gameId);
+  }
+
+  getCollectionGames(collectionId: number): number[] {
+    const rows = this.connection.prepare("SELECT game_id FROM collection_games WHERE collection_id = ?").all(collectionId) as Array<{ game_id: number }>;
+    return rows.map((r) => r.game_id);
   }
 
   private runMigrations(): void {

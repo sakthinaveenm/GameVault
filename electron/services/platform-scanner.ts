@@ -141,6 +141,61 @@ async function fetchSteamCoverUrl(title: string): Promise<string | null> {
   return null;
 }
 
+export type ScannedMetadata = {
+  description?: string;
+  coverPath?: string;
+  developer?: string;
+  publisher?: string;
+  genres?: string;
+  releaseDate?: string;
+};
+
+export async function fetchFullMetadataForGame(title: string): Promise<ScannedMetadata | null> {
+  try {
+    const cleanTitle = title
+      .replace(/\b(enhanced|gold|ultimate|goty|edition|deluxe|complete|remastered)\b/gi, "")
+      .trim();
+
+    const searchUrl = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(cleanTitle)}&l=english&cc=US`;
+    const searchRes = await fetch(searchUrl);
+    if (!searchRes.ok) return null;
+
+    const searchData: any = await searchRes.json();
+    if (!searchData || !searchData.items || searchData.items.length === 0) return null;
+
+    const match = searchData.items.find(
+      (item: any) => item.name.toLowerCase() === title.toLowerCase()
+    ) || searchData.items[0];
+
+    if (!match || !match.id) return null;
+
+    const appId = match.id;
+    const detailsUrl = `https://store.steampowered.com/api/appdetails?appids=${appId}`;
+    const detailsRes = await fetch(detailsUrl);
+    if (!detailsRes.ok) {
+      return {
+        coverPath: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`
+      };
+    }
+
+    const detailsData: any = await detailsRes.json();
+    if (detailsData && detailsData[appId] && detailsData[appId].success) {
+      const data = detailsData[appId].data;
+      return {
+        description: data.short_description || data.about_the_game || "",
+        coverPath: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`,
+        developer: data.developers ? data.developers.join(", ") : "",
+        publisher: data.publishers ? data.publishers.join(", ") : "",
+        genres: data.genres ? data.genres.map((g: any) => g.description).join(", ") : "",
+        releaseDate: data.release_date ? data.release_date.date : "",
+      };
+    }
+  } catch (err) {
+    console.error(`Failed to fetch Steam full metadata for "${title}":`, err);
+  }
+  return null;
+}
+
 export async function scanEpicGames(): Promise<ScannedPlatformGame[]> {
   const games: ScannedPlatformGame[] = [];
   const epicDir = await getEpicManifestDir();

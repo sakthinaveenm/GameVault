@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import type { Game } from "../types/window";
-import { X, Play, Clock, Calendar, Building, Tag, FileText, Edit, Trash2, Save } from "lucide-react";
+import { X, Play, Clock, Calendar, Building, Tag, FileText, Edit, Trash2, Save, RefreshCw } from "lucide-react";
 import confetti from "canvas-confetti";
 
 interface GameDetailsPageProps {
@@ -28,10 +28,25 @@ export function GameDetailsPage({
   const [genresList, setGenresList] = useState(game.genres || "");
   const [relDate, setRelDate] = useState(game.releaseDate || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [launchArgs, setLaunchArgs] = useState(game.launchArguments || "");
+  const [hiddenState, setHiddenState] = useState(game.isHidden || false);
+  const [history, setHistory] = useState<any[]>([]);
 
   // Active Session Timer state
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const hist = await window.gameVault.getLaunchHistory(game.id);
+        setHistory(hist);
+      } catch (err) {
+        console.error("Failed to load launch history:", err);
+      }
+    };
+    void loadHistory();
+  }, [game.id, isRunning]);
 
   // Trigger confetti when launching game
   const handlePlayClick = () => {
@@ -88,7 +103,9 @@ export function GameDetailsPage({
         developer: dev.trim(),
         publisher: pub.trim(),
         genres: genresList.trim(),
-        releaseDate: relDate.trim()
+        releaseDate: relDate.trim(),
+        launchArguments: launchArgs.trim(),
+        isHidden: hiddenState
       });
       setIsEditing(false);
     } catch (err) {
@@ -129,6 +146,21 @@ export function GameDetailsPage({
               type="button"
             >
               <Edit className="size-4" /> Edit Details
+            </button>
+            <button
+              onClick={async () => {
+                const success = await window.gameVault.triggerSingleGameMetadata(game.id, game.title);
+                if (success) {
+                  alert("Successfully fetched Steam metadata! Re-open detail card to view.");
+                  onClose();
+                } else {
+                  alert("No matching Steam metadata found on Steam store.");
+                }
+              }}
+              className="flex items-center gap-2 rounded-xl bg-zinc-900/80 border border-white/10 px-4 py-2 text-sm font-semibold hover:bg-zinc-800 transition"
+              type="button"
+            >
+              <RefreshCw className="size-4" /> Sync Metadata
             </button>
             {onRemoveGame && (
               <button
@@ -248,8 +280,30 @@ export function GameDetailsPage({
                     rows={4}
                     value={desc}
                     onChange={(e) => setDesc(e.target.value)}
-                    className="w-full mt-2 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                    className="w-full mt-2 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
                   />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold uppercase text-zinc-500">Launch Arguments</label>
+                  <input
+                    type="text"
+                    value={launchArgs}
+                    onChange={(e) => setLaunchArgs(e.target.value)}
+                    className="w-full mt-2 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-[var(--accent)] text-white"
+                    placeholder="E.g. -novid -windowed"
+                  />
+                </div>
+                <div className="col-span-2 flex items-center gap-3 bg-zinc-950/40 p-3 rounded-xl border border-white/5">
+                  <input
+                    type="checkbox"
+                    id="isHiddenCheckbox"
+                    checked={hiddenState}
+                    onChange={(e) => setHiddenState(e.target.checked)}
+                    className="accent-[var(--accent)] size-4 cursor-pointer"
+                  />
+                  <label htmlFor="isHiddenCheckbox" className="text-xs font-semibold uppercase text-zinc-400 cursor-pointer select-none">
+                    Hide Game in Library
+                  </label>
                 </div>
               </div>
 
@@ -286,6 +340,22 @@ export function GameDetailsPage({
                 </div>
               ) : (
                 <p className="text-zinc-600 text-sm italic">No description available. Click Edit Details to add one.</p>
+              )}
+
+              {history.length > 0 && (
+                <div className="space-y-3 mt-8">
+                  <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-zinc-500">
+                    <Clock className="size-4 text-[var(--accent)]" /> Gameplay Sessions History
+                  </h3>
+                  <div className="rounded-2xl border border-white/5 bg-zinc-900/20 divide-y divide-white/5 max-h-56 overflow-y-auto font-mono text-xs">
+                    {history.map((session) => (
+                      <div key={session.id} className="flex justify-between px-4 py-2.5 text-zinc-300 font-mono">
+                        <span>{session.launchedAt}</span>
+                        <span className="font-bold text-[var(--accent)]">{formatPlaytime(session.durationSeconds)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
