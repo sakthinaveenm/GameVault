@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+            args: ''
+          - platform: 'macos-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: npm ci || npm install
+
+      - name: Build Tauri App and Publish Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name || 'v0.1.0' }}
+          releaseName: 'Universal Game Hub v0.1.0'
+          releaseBody: |
+            # Universal Game Hub v0.1.0
+
+            Universal Game Hub is a lightweight, cross-platform desktop gaming launcher inspired by Steam Big Picture Mode and Playnite.
+
+            ### Downloads:
+            - **Windows**: `Universal Game Hub_0.1.0_x64-setup.exe` (NSIS Installer) & `.msi` package
+            - **macOS**: `Universal Game Hub_0.1.0_aarch64.dmg` & `.app.tar.gz`
+
+            ### Key Features:
+            - **Unified Game Library**: Discovers and launches games from Steam, Epic Games, GOG, Local PC, Retro ROMs, and Batocera systems.
+            - **Controller-First Navigation**: Gilrs gamepad engine with live visualizer, deadzone calibration, and haptic feedback.
+            - **Local SQLite Database**: Multi-profile isolation for favorites, playtime, and custom categories.
+            - **Save Game Manager**: Automated snapshots, recursive SHA-256 change detection, and pre-restore safety backups.
+            - **Google Drive Cloud Sync**: OAuth 2.0 PKCE flow, deterministic hash manifest sync, and conflict resolution.
+            - **Authenticated Backup Encryption**: Client-side AES-256-GCM encryption with SHA-256 key derivation.
+            - **Download Manager**: Resumable streaming downloads with SHA-256 integrity checksum verification and explicit user confirmation gate.
+            - **Playtime Analytics**: Verified gameplay metrics, platform distribution, and session history.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
