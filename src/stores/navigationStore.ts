@@ -19,6 +19,7 @@ interface NavigationState {
 
 const TABS: NavigationTab[] = [
   'home',
+  'store',
   'library',
   'retro',
   'emulators',
@@ -75,4 +76,3 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
     set({ currentTab: TABS[prevIdx] });
   },
 }));
-

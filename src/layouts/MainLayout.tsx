@@ -15,6 +15,7 @@ import { AddGameModal } from '@/components/dialogs/AddGameModal';
 import { ScanFoldersModal } from '@/components/dialogs/ScanFoldersModal';
 
 import { HomeScreen } from '@/features/home/HomeScreen';
+import { StoreScreen } from '@/features/store/StoreScreen';
 import { LibraryScreen } from '@/features/library/LibraryScreen';
 import { RetroScreen } from '@/features/retro/RetroScreen';
 import { EmulatorsScreen } from '@/features/emulators/EmulatorsScreen';
@@ -66,6 +67,8 @@ export const MainLayout: React.FC = () => {
     switch (currentTab) {
       case 'home':
         return <HomeScreen onSelectGame={(g) => setSelectedGame(g)} />;
+      case 'store':
+        return <StoreScreen />;
       case 'library':
         return (
           <LibraryScreen
@@ -141,4 +144,3 @@ export const MainLayout: React.FC = () => {
     </div>
   );
 };
-

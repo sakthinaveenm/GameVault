@@ -23,6 +23,7 @@ interface PrimaryTab {
 
 const PRIMARY_TABS: PrimaryTab[] = [
   { id: 'home', label: 'Home' },
+  { id: 'store', label: 'Store' },
   { id: 'library', label: 'Library' },
   { id: 'retro', label: 'Retro' },
   { id: 'saves', label: 'Saves' },

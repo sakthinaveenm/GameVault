@@ -4,6 +4,7 @@ import { useProfileStore } from '@/stores/profileStore';
 import { NavigationTab } from '@/types';
 import {
   LayoutDashboard,
+  Store,
   Gamepad2,
   Tv,
   Cpu,
@@ -29,6 +30,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Home', icon: LayoutDashboard },
+  { id: 'store', label: 'Store & Catalog', icon: Store, badge: 'HOT' },
   { id: 'library', label: 'My Games', icon: Gamepad2 },
   { id: 'retro', label: 'Retro Consoles', icon: Tv },
   { id: 'emulators', label: 'Emulators', icon: Cpu },
@@ -112,6 +114,12 @@ export const Sidebar: React.FC = () => {
                   />
                   <span className="text-sm truncate tracking-wide text-left">{item.label}</span>
                 </div>
+
+                {item.badge && !isActive && (
+                  <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                    {item.badge}
+                  </span>
+                )}
 
                 {isActive && (
                   <span className="w-2 h-2 rounded-full bg-sky-400 shadow-[0_0_8px_#38bdf8]" />

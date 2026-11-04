@@ -119,6 +119,7 @@ export interface ControllerInfo {
 
 export type NavigationTab =
   | 'home'
+  | 'store'
   | 'library'
   | 'retro'
   | 'emulators'
@@ -130,4 +131,3 @@ export type NavigationTab =
   | 'controllers'
   | 'downloads'
   | 'settings';
-
