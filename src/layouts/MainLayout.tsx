@@ -32,12 +32,18 @@ export const MainLayout: React.FC = () => {
   useControllerNavigation();
 
   const { currentTab } = useNavigationStore();
-  const { games, recordPlaytime } = useLibraryStore();
+  const { games, recordPlaytime, loadGamesFromDb } = useLibraryStore();
   const { activeProfile } = useProfileStore();
 
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (activeProfile?.id) {
+      loadGamesFromDb(activeProfile.id);
+    }
+  }, [activeProfile?.id, loadGamesFromDb]);
 
   const handleLaunchGame = async (game: Game) => {
     if (game.executablePath) {

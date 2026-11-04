@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Game, GameSource, PlatformType } from '@/types';
 import { api } from '@/services/tauri';
+import { useProfileStore } from './profileStore';
 
 export type SortOption = 'name' | 'playtime' | 'lastPlayed' | 'releaseDate';
 
@@ -38,9 +39,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   onlyFavorites: false,
   sortBy: 'name',
 
-  loadGamesFromDb: async (profileId: string) => {
+  loadGamesFromDb: async (profileId?: string) => {
+    const targetId = profileId || useProfileStore.getState().activeProfile?.id;
+    if (!targetId) return;
     try {
-      const list = await api.listGames(profileId);
+      const list = await api.listGames(targetId);
       if (list && list.length > 0) {
         set({ games: list });
       }
@@ -94,9 +97,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     if (game) {
       const newFav = !game.isFavorite;
       get().updateGame(id, { isFavorite: newFav });
-      if (profileId) {
+      const targetProfileId = profileId || useProfileStore.getState().activeProfile?.id;
+      if (targetProfileId) {
         try {
-          await api.toggleFavorite(profileId, id, newFav);
+          await api.toggleFavorite(targetProfileId, id, newFav);
         } catch (e) {
           console.warn('Failed to toggle favorite in DB:', e);
         }
@@ -113,9 +117,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         playtimeMinutes: updatedTime,
         lastPlayedAt: new Date().toISOString(),
       });
-      if (profileId) {
+      const targetProfileId = profileId || useProfileStore.getState().activeProfile?.id;
+      if (targetProfileId) {
         try {
-          await api.recordPlaytime(profileId, id, minutes);
+          await api.recordPlaytime(targetProfileId, id, minutes);
         } catch (e) {
           console.warn('Failed to record playtime in DB:', e);
         }
