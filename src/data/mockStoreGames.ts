@@ -276,3 +276,4 @@ export const MOCK_STORE_GAMES: StoreGame[] = [
     ],
   },
 ];
+

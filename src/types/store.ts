@@ -39,3 +39,4 @@ export interface StoreApiResponse {
   complete?: boolean;
   games: StoreGame[];
 }
+

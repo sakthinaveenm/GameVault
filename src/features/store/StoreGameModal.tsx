@@ -357,3 +357,4 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
     </div>
   );
 };
+
