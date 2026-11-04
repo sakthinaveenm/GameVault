@@ -19,6 +19,38 @@ export interface BatoceraNodeDto {
   latency_ms?: number;
 }
 
+export interface ProfileStatisticsDto {
+  total_playtime_minutes: number;
+  total_games: number;
+  installed_games: number;
+  favorite_games: number;
+  platform_breakdown: Record<string, number>;
+  top_played_games: Array<{
+    id: string;
+    title: string;
+    playtime_minutes: number;
+    cover_url?: string;
+  }>;
+}
+
+export interface DownloadItemDto {
+  id: string;
+  title: string;
+  source_url: string;
+  destination_path: string;
+  total_bytes: number;
+  downloaded_bytes: number;
+  status: string;
+  checksum?: string;
+  created_at: string;
+}
+
+export interface PkceSessionDto {
+  code_verifier: string;
+  code_challenge: string;
+  state: string;
+}
+
 export const api = {
   ping: async (): Promise<string> => {
     if (isTauriEnvironment()) {
@@ -195,5 +227,81 @@ export const api = {
       return await invoke<BatoceraNodeDto>('ping_batocera_node', { host, port });
     }
     return { host, port, is_online: true, latency_ms: 12 };
+  },
+
+  getProfileStatistics: async (profileId: string): Promise<ProfileStatisticsDto> => {
+    if (isTauriEnvironment()) {
+      return await invoke<ProfileStatisticsDto>('get_profile_statistics', { profileId });
+    }
+    return {
+      total_playtime_minutes: 360,
+      total_games: 4,
+      installed_games: 3,
+      favorite_games: 2,
+      platform_breakdown: { pc: 2, steam: 1, snes: 1 },
+      top_played_games: [
+        { id: 'g1', title: 'Cyberpunk 2077', playtime_minutes: 240 },
+        { id: 'g2', title: 'Hades II', playtime_minutes: 120 },
+      ],
+    };
+  },
+
+  listDownloads: async (): Promise<DownloadItemDto[]> => {
+    if (isTauriEnvironment()) {
+      return await invoke<DownloadItemDto[]>('list_downloads');
+    }
+    return [];
+  },
+
+  queueDownload: async (
+    title: string,
+    sourceUrl: string,
+    destinationPath: string,
+    expectedChecksum?: string
+  ): Promise<DownloadItemDto> => {
+    if (isTauriEnvironment()) {
+      return await invoke<DownloadItemDto>('queue_download', {
+        title,
+        sourceUrl,
+        destinationPath,
+        expectedChecksum: expectedChecksum || null,
+      });
+    }
+    return {
+      id: `dl-${Date.now()}`,
+      title,
+      source_url: sourceUrl,
+      destination_path: destinationPath,
+      total_bytes: 104857600,
+      downloaded_bytes: 0,
+      status: 'queued',
+      checksum: expectedChecksum,
+      created_at: new Date().toISOString(),
+    };
+  },
+
+  executeDownloadedInstaller: async (
+    filePath: string,
+    userConfirmed: boolean
+  ): Promise<number> => {
+    if (isTauriEnvironment()) {
+      return await invoke<number>('execute_downloaded_installer', {
+        filePath,
+        userConfirmed,
+      });
+    }
+    console.log(`[Browser Sim] Installer execution confirmed: ${userConfirmed}`);
+    return 9999;
+  },
+
+  generateOAuthPkce: async (): Promise<PkceSessionDto> => {
+    if (isTauriEnvironment()) {
+      return await invoke<PkceSessionDto>('generate_oauth_pkce');
+    }
+    return {
+      code_verifier: 'simulated_pkce_verifier_string_abcdef123456',
+      code_challenge: 'simulated_pkce_challenge_abcdef123456',
+      state: 'simulated-state-uuid',
+    };
   },
 };

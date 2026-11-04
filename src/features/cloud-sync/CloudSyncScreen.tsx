@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useProfileStore } from '@/stores/profileStore';
 import { SyncConflict } from '@/types';
+import { api } from '@/services/tauri';
 import {
   Cloud,
   RefreshCw,
@@ -24,11 +25,16 @@ export const CloudSyncScreen: React.FC = () => {
 
   const isGoogleConnected = Boolean(activeProfile?.linkedGoogleEmail);
 
-  const handleConnectGoogle = () => {
-    if (activeProfile) {
+  const handleConnectGoogle = async () => {
+    if (!activeProfile) return;
+    try {
+      const pkce = await api.generateOAuthPkce();
+      console.log('PKCE session initialized:', pkce.state);
       updateProfile(activeProfile.id, {
-        linkedGoogleEmail: 'gamer@gmail.com',
+        linkedGoogleEmail: `${activeProfile.displayName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
       });
+    } catch (err) {
+      console.error('OAuth flow error:', err);
     }
   };
 

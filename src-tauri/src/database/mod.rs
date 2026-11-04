@@ -42,6 +42,24 @@ impl DatabaseManager {
         Ok(Self { pool })
     }
 
+    pub async fn init_in_memory() -> AppResult<Self> {
+        let connect_options = SqliteConnectOptions::from_str("sqlite::memory:")?
+            .foreign_keys(true);
+
+        let pool = SqlitePoolOptions::new()
+            .connect_with(connect_options)
+            .await?;
+
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .map_err(|e| AppError::Database(sqlx::Error::Migrate(Box::new(e))))?;
+
+        Self::ensure_default_profile(&pool).await?;
+
+        Ok(Self { pool })
+    }
+
     pub fn pool(&self) -> &DbPool {
         &self.pool
     }

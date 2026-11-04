@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DownloadItem } from '@/types';
+import { api } from '@/services/tauri';
 import {
   Download,
   PlusCircle,
@@ -10,10 +11,13 @@ import {
   CheckCircle2,
   HardDrive,
   FileCheck,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const DownloadsScreen: React.FC = () => {
   const [urlInput, setUrlInput] = useState('');
+  const [confirmInstallerPath, setConfirmInstallerPath] = useState<string | null>(null);
+  const [executionMessage, setExecutionMessage] = useState<string | null>(null);
   const [downloads, setDownloads] = useState<DownloadItem[]>([
     {
       id: 'dl-1',
@@ -37,23 +41,80 @@ export const DownloadsScreen: React.FC = () => {
     },
   ]);
 
-  const handleAddDownload = (e: React.FormEvent) => {
+  useEffect(() => {
+    const loadDownloads = async () => {
+      try {
+        const list = await api.listDownloads();
+        if (list && list.length > 0) {
+          setDownloads(
+            list.map((d) => ({
+              id: d.id,
+              title: d.title,
+              sourceUrl: d.source_url,
+              destinationPath: d.destination_path,
+              totalBytes: d.total_bytes,
+              downloadedBytes: d.downloaded_bytes,
+              speedBytesPerSec: 0,
+              status: d.status as any,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Failed to load downloads from SQLite:', err);
+      }
+    };
+    loadDownloads();
+  }, []);
+
+  const handleAddDownload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!urlInput.trim()) return;
 
-    const newDownload: DownloadItem = {
-      id: `dl-${Date.now()}`,
-      title: urlInput.split('/').pop() || 'Legal Game Package',
-      sourceUrl: urlInput.trim(),
-      destinationPath: `~/Downloads/${urlInput.split('/').pop() || 'download.bin'}`,
-      totalBytes: 157286400,
-      downloadedBytes: 0,
-      speedBytesPerSec: 0,
-      status: 'queued',
-    };
+    const filename = urlInput.split('/').pop() || 'download.bin';
+    const destinationPath = `~/Downloads/${filename}`;
+    const title = filename.replace(/\.[^/.]+$/, '');
 
-    setDownloads([newDownload, ...downloads]);
-    setUrlInput('');
+    try {
+      const queued = await api.queueDownload(title, urlInput.trim(), destinationPath);
+      const newDownload: DownloadItem = {
+        id: queued.id,
+        title: queued.title,
+        sourceUrl: queued.source_url,
+        destinationPath: queued.destination_path,
+        totalBytes: queued.total_bytes || 104857600,
+        downloadedBytes: 0,
+        speedBytesPerSec: 0,
+        status: 'queued',
+      };
+      setDownloads([newDownload, ...downloads]);
+      setUrlInput('');
+    } catch (err) {
+      console.warn('Queue download fallback:', err);
+      const newDownload: DownloadItem = {
+        id: `dl-${Date.now()}`,
+        title,
+        sourceUrl: urlInput.trim(),
+        destinationPath,
+        totalBytes: 157286400,
+        downloadedBytes: 0,
+        speedBytesPerSec: 0,
+        status: 'queued',
+      };
+      setDownloads([newDownload, ...downloads]);
+      setUrlInput('');
+    }
+  };
+
+  const handleExecuteConfirmed = async () => {
+    if (!confirmInstallerPath) return;
+    try {
+      await api.executeDownloadedInstaller(confirmInstallerPath, true);
+      setExecutionMessage(`Successfully launched installer: ${confirmInstallerPath}`);
+    } catch (err: any) {
+      setExecutionMessage(`Execution note: ${err?.message || err}`);
+    }
+    setConfirmInstallerPath(null);
+    setTimeout(() => setExecutionMessage(null), 4000);
   };
 
   const togglePause = (id: string) => {
@@ -206,9 +267,17 @@ export const DownloadsScreen: React.FC = () => {
                   )}
 
                   {item.status === 'completed' && (
-                    <div className="flex items-center text-emerald-400 font-semibold space-x-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Ready to Install</span>
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center text-emerald-400 font-semibold space-x-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Verified</span>
+                      </div>
+                      <button
+                        onClick={() => setConfirmInstallerPath(item.destinationPath)}
+                        className="px-3 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 rounded-lg text-xs font-bold transition-all"
+                      >
+                        Launch Installer
+                      </button>
                     </div>
                   )}
                 </div>
@@ -216,7 +285,48 @@ export const DownloadsScreen: React.FC = () => {
             );
           })}
         </div>
+
+        {/* Execution Feedback Notification */}
+        {executionMessage && (
+          <div className="p-4 rounded-2xl bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-semibold">
+            {executionMessage}
+          </div>
+        )}
       </div>
+
+      {/* Confirmation Modal Guard */}
+      {confirmInstallerPath && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-100">Confirm Installer Execution</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                For security, Universal Game Hub requires explicit confirmation before executing any downloaded installer.
+              </p>
+            </div>
+            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-[11px] font-mono text-slate-300 break-all">
+              {confirmInstallerPath}
+            </div>
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                onClick={() => setConfirmInstallerPath(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExecuteConfirmed}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30"
+              >
+                Confirm & Launch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,6 +1,8 @@
 use crate::batocera::{BatoceraClient, BatoceraNodeInfo};
+use crate::cloud::oauth::{OAuthManager, PkceSession};
 use crate::controllers::{ControllerDevice, ControllerInputEvent, ControllerManager};
 use crate::database::DbPool;
+use crate::downloads::{DownloadItem, DownloadManager};
 use crate::emulators::EmulatorRunner;
 use crate::errors::AppError;
 use crate::games::launcher::GameLauncher;
@@ -11,6 +13,7 @@ use crate::platform::PlatformAdapter;
 use crate::repositories::game_repository::GameRepository;
 use crate::repositories::profile_repository::ProfileRepository;
 use crate::save_manager::SaveService;
+use crate::statistics::{ProfileStatistics, StatisticsService};
 use crate::stores::StoreManager;
 use std::path::PathBuf;
 
@@ -214,4 +217,50 @@ pub async fn restore_save_snapshot(
     target_save_dir: String,
 ) -> Result<(), AppError> {
     SaveService::restore_snapshot(&pool, &snapshot_id, &PathBuf::from(target_save_dir)).await
+}
+
+#[tauri::command]
+pub async fn get_profile_statistics(
+    pool: tauri::State<'_, DbPool>,
+    profile_id: String,
+) -> Result<ProfileStatistics, AppError> {
+    StatisticsService::get_profile_statistics(&pool, &profile_id).await
+}
+
+#[tauri::command]
+pub async fn list_downloads(
+    pool: tauri::State<'_, DbPool>,
+) -> Result<Vec<DownloadItem>, AppError> {
+    DownloadManager::list_downloads(&pool).await
+}
+
+#[tauri::command]
+pub async fn queue_download(
+    pool: tauri::State<'_, DbPool>,
+    title: String,
+    source_url: String,
+    destination_path: String,
+    expected_checksum: Option<String>,
+) -> Result<DownloadItem, AppError> {
+    DownloadManager::queue_download(
+        &pool,
+        &title,
+        &source_url,
+        &PathBuf::from(destination_path),
+        expected_checksum.as_deref(),
+    )
+    .await
+}
+
+#[tauri::command]
+pub fn execute_downloaded_installer(
+    file_path: String,
+    user_confirmed: bool,
+) -> Result<u32, AppError> {
+    DownloadManager::execute_installer(&PathBuf::from(file_path), user_confirmed)
+}
+
+#[tauri::command]
+pub fn generate_oauth_pkce() -> PkceSession {
+    OAuthManager::generate_pkce()
 }

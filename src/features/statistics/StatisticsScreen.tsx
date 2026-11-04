@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { useProfileStore } from '@/stores/profileStore';
+import { api, ProfileStatisticsDto } from '@/services/tauri';
 import {
   BarChart2,
   Clock,
@@ -11,16 +13,39 @@ import {
 
 export const StatisticsScreen: React.FC = () => {
   const { games } = useLibraryStore();
+  const { activeProfile } = useProfileStore();
+  const [stats, setStats] = useState<ProfileStatisticsDto | null>(null);
 
-  const totalPlaytime = games.reduce((acc, g) => acc + (g.playtimeMinutes || 0), 0);
+  useEffect(() => {
+    if (!activeProfile) return;
+    const fetchStats = async () => {
+      try {
+        const res = await api.getProfileStatistics(activeProfile.id);
+        setStats(res);
+      } catch (err) {
+        console.error('Failed to load profile statistics:', err);
+      }
+    };
+    fetchStats();
+  }, [activeProfile?.id, games.length]);
+
+  const totalPlaytime = stats ? stats.total_playtime_minutes : games.reduce((acc, g) => acc + (g.playtimeMinutes || 0), 0);
   const totalHours = Math.round(totalPlaytime / 60);
 
-  const mostPlayed = [...games]
-    .filter((g) => (g.playtimeMinutes || 0) > 0)
-    .sort((a, b) => (b.playtimeMinutes || 0) - (a.playtimeMinutes || 0))
-    .slice(0, 5);
+  const mostPlayed = stats?.top_played_games && stats.top_played_games.length > 0
+    ? stats.top_played_games
+    : [...games]
+        .filter((g) => (g.playtimeMinutes || 0) > 0)
+        .sort((a, b) => (b.playtimeMinutes || 0) - (a.playtimeMinutes || 0))
+        .slice(0, 5)
+        .map((g) => ({
+          id: g.id,
+          title: g.title,
+          playtime_minutes: g.playtimeMinutes || 0,
+          cover_url: g.coverUrl,
+        }));
 
-  const platformCounts = games.reduce<Record<string, number>>((acc, g) => {
+  const platformCounts: Record<string, number> = stats?.platform_breakdown || games.reduce<Record<string, number>>((acc, g) => {
     acc[g.platform] = (acc[g.platform] || 0) + 1;
     return acc;
   }, {});
@@ -89,8 +114,10 @@ export const StatisticsScreen: React.FC = () => {
           {mostPlayed.length > 0 ? (
             <div className="space-y-2.5">
               {mostPlayed.map((game, index) => {
-                const hours = ((game.playtimeMinutes || 0) / 60).toFixed(1);
-                const percent = totalHours > 0 ? ((game.playtimeMinutes || 0) / (totalPlaytime || 1)) * 100 : 0;
+                const playtimeMins = (game as any).playtime_minutes ?? (game as any).playtimeMinutes ?? 0;
+                const cover = (game as any).cover_url ?? (game as any).coverUrl;
+                const hours = (playtimeMins / 60).toFixed(1);
+                const percent = totalHours > 0 ? (playtimeMins / (totalPlaytime || 1)) * 100 : 0;
 
                 return (
                   <div
@@ -102,8 +129,8 @@ export const StatisticsScreen: React.FC = () => {
                         #{index + 1}
                       </span>
                       <div className="w-10 h-10 rounded-xl bg-slate-900 overflow-hidden shrink-0">
-                        {game.coverUrl ? (
-                          <img src={game.coverUrl} alt={game.title} className="w-full h-full object-cover" />
+                        {cover ? (
+                          <img src={cover} alt={game.title} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-slate-600 text-[10px]">
                             🎮
@@ -112,7 +139,6 @@ export const StatisticsScreen: React.FC = () => {
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-200">{game.title}</div>
-                        <div className="text-[11px] text-slate-500 capitalize">{game.platform}</div>
                       </div>
                     </div>
 
