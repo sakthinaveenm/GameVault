@@ -120,3 +120,4 @@ mod tests {
         assert!(game.launch_arguments.as_deref().unwrap().contains("epicgames.launcher"));
     }
 }
+

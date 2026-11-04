@@ -185,3 +185,4 @@ CREATE INDEX IF NOT EXISTS idx_games_platform ON games(platform);
 CREATE INDEX IF NOT EXISTS idx_profile_game_favorite ON profile_game_data(profile_id, is_favorite);
 CREATE INDEX IF NOT EXISTS idx_save_snapshots_game ON save_snapshots(profile_id, game_id);
 CREATE INDEX IF NOT EXISTS idx_save_files_snapshot ON save_files(snapshot_id);
+

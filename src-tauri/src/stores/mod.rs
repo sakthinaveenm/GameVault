@@ -57,3 +57,4 @@ mod tests {
         let _ = games.len();
     }
 }
+
