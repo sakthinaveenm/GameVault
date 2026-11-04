@@ -33,9 +33,18 @@ pub fn run() {
             let db_path = app_data_dir.join("universal_game_hub.sqlite");
             
             tauri::async_runtime::block_on(async {
-                let db_manager = database::DatabaseManager::init(&db_path)
-                    .await
-                    .expect("Failed to initialize SQLite database");
+                let db_manager = match database::DatabaseManager::init(&db_path).await {
+                    Ok(mgr) => mgr,
+                    Err(err) => {
+                        eprintln!(
+                            "Warning: Failed to initialize SQLite database at {:?}: {}. Falling back to in-memory database.",
+                            db_path, err
+                        );
+                        database::DatabaseManager::init_in_memory()
+                            .await
+                            .expect("Failed to initialize in-memory SQLite database fallback")
+                    }
+                };
                 app.manage(db_manager.pool().clone());
             });
 

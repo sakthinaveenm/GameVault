@@ -8,6 +8,8 @@ const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
+  // Essential for Tauri to load bundled assets via relative paths in production
+  base: "./",
   plugins: [
     react(),
     tailwindcss(),

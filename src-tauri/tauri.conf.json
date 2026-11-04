@@ -12,13 +12,16 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Universal Game Hub",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
         "minHeight": 600,
         "fullscreen": false,
-        "resizable": true
+        "resizable": true,
+        "backgroundColor": "#0b0e14",
+        "devtools": true
       }
     ],
     "security": {

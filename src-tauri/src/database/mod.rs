@@ -18,8 +18,8 @@ impl DatabaseManager {
             fs::create_dir_all(parent)?;
         }
 
-        let connection_str = format!("sqlite://{}?mode=rwc", database_path.display());
-        let connect_options = SqliteConnectOptions::from_str(&connection_str)?
+        let connect_options = SqliteConnectOptions::new()
+            .filename(database_path)
             .create_if_missing(true)
             .foreign_keys(true);
 
