@@ -1,11 +1,17 @@
+pub mod batocera;
 pub mod commands;
 pub mod controllers;
 pub mod database;
+pub mod emulators;
 pub mod errors;
 pub mod games;
+pub mod metadata;
 pub mod models;
 pub mod platform;
 pub mod repositories;
+pub mod save_manager;
+pub mod security;
+pub mod stores;
 
 use tauri::Manager;
 
@@ -46,6 +52,15 @@ pub fn run() {
             commands::record_game_playtime,
             commands::delete_game,
             commands::launch_game,
+            commands::discover_store_games,
+            commands::get_game_metadata,
+            commands::cache_game_metadata,
+            commands::get_known_emulators,
+            commands::launch_rom,
+            commands::ping_batocera_node,
+            commands::create_game_save_snapshot,
+            commands::list_save_snapshots,
+            commands::restore_save_snapshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Universal Game Hub");

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLibraryStore, SortOption } from '@/stores/libraryStore';
+import { api } from '@/services/tauri';
 import { Game, GameSource } from '@/types';
 import { GameCard } from '@/components/game-cards/GameCard';
 import {
@@ -11,6 +12,7 @@ import {
   CheckCircle2,
   Star,
   Gamepad2,
+  RefreshCw,
 } from 'lucide-react';
 
 interface LibraryScreenProps {
@@ -50,6 +52,26 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
   } = useLibraryStore();
 
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const [isSyncingStores, setIsSyncingStores] = useState(false);
+
+  const handleSyncStores = async () => {
+    setIsSyncingStores(true);
+    try {
+      const storeGames = await api.discoverStoreGames();
+      if (storeGames && storeGames.length > 0) {
+        for (const g of storeGames) {
+          useLibraryStore.getState().addGame(g);
+        }
+        alert(`Discovered and synced ${storeGames.length} titles from Steam and Epic Games!`);
+      } else {
+        alert('Storefront discovery complete. Ensure Steam or Epic Games Launcher is installed.');
+      }
+    } catch (e: any) {
+      alert(`Store discovery error: ${e?.message || e}`);
+    } finally {
+      setIsSyncingStores(false);
+    }
+  };
 
   const filteredGames = React.useMemo(() => {
     return games
@@ -89,6 +111,14 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
           </div>
 
           <div className="flex items-center space-x-3">
+            <button
+              onClick={handleSyncStores}
+              disabled={isSyncingStores}
+              className="flex items-center space-x-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 transition-all shadow-sm"
+            >
+              <RefreshCw className={`w-4 h-4 text-sky-400 ${isSyncingStores ? 'animate-spin' : ''}`} />
+              <span>{isSyncingStores ? 'Syncing...' : 'Sync Steam & Epic'}</span>
+            </button>
             <button
               onClick={onOpenScanModal}
               className="flex items-center space-x-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 transition-all shadow-sm"

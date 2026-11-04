@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Emulator } from '@/types';
+import { api } from '@/services/tauri';
 import {
   Cpu,
   CheckCircle2,
@@ -80,6 +81,20 @@ export const EmulatorsScreen: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPath, setEditPath] = useState('');
   const [editArgs, setEditArgs] = useState('');
+
+  useEffect(() => {
+    const loadEmulators = async () => {
+      try {
+        const detected = await api.getKnownEmulators();
+        if (detected && detected.length > 0) {
+          setEmulators(detected);
+        }
+      } catch (err) {
+        console.error('Failed to load emulators from backend:', err);
+      }
+    };
+    loadEmulators();
+  }, []);
 
   const handleStartEdit = (emu: Emulator) => {
     setEditingId(emu.id);

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { api } from '@/services/tauri';
 import {
   Network,
   Wifi,
@@ -20,18 +21,22 @@ export const BatoceraScreen: React.FC = () => {
 
   const handleTestConnection = async () => {
     setConnectionStatus('testing');
-    setStatusMessage(`Pinging Batocera node at ${hostIp}:${port}...`);
+    const portNum = parseInt(port, 10) || 22;
+    setStatusMessage(`Pinging Batocera node at ${hostIp}:${portNum}...`);
 
-    // Simulated network ping check
-    setTimeout(() => {
-      if (hostIp.trim()) {
+    try {
+      const res = await api.pingBatoceraNode(hostIp, portNum);
+      if (res.is_online) {
         setConnectionStatus('connected');
-        setStatusMessage(`Successfully connected to Batocera system at ${hostIp}.`);
+        setStatusMessage(`Successfully reached Batocera host ${hostIp}:${portNum} (latency: ${res.latency_ms ?? 0}ms).`);
       } else {
         setConnectionStatus('error');
-        setStatusMessage('Connection timed out. Check IP address and ensure Batocera is on your LAN.');
+        setStatusMessage(`Unable to reach Batocera node at ${hostIp}:${portNum}. Verify IP and ensure node is awake.`);
       }
-    }, 1200);
+    } catch (err: any) {
+      setConnectionStatus('error');
+      setStatusMessage(`Connection error: ${err?.message || err || 'Network failure'}`);
+    }
   };
 
   return (

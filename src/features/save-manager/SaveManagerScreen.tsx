@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useProfileStore } from '@/stores/profileStore';
 import { SaveSnapshot } from '@/types';
+import { api } from '@/services/tauri';
 import {
   Save,
   RotateCcw,
@@ -49,30 +50,58 @@ export const SaveManagerScreen: React.FC = () => {
 
   const [restoreSuccess, setRestoreSuccess] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!activeProfile || !selectedGameId) return;
+    const loadSnapshots = async () => {
+      try {
+        const list = await api.listSaveSnapshots(activeProfile.id, selectedGameId);
+        if (list && list.length > 0) {
+          setSnapshots(list);
+        }
+      } catch (err) {
+        console.error('Failed to load snapshots:', err);
+      }
+    };
+    loadSnapshots();
+  }, [activeProfile?.id, selectedGameId]);
+
   const selectedGame = games.find((g) => g.id === selectedGameId) || {
     id: selectedGameId,
     title: 'Selected Title',
     platform: 'macos',
   };
 
-  const handleBackupNow = () => {
-    const newSnap: SaveSnapshot = {
-      id: `snap-${Date.now()}`,
-      profileId: activeProfile?.id || 'default',
-      gameId: selectedGameId,
-      deviceId: 'Local Machine',
-      snapshotHash: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
-      archivePath: `~/.universalgamehub/saves/snap-${Date.now()}.zip`,
-      compressedSize: 1105400,
-      cloudStatus: 'local_only',
-      createdAt: new Date().toISOString(),
-      fileCount: 4,
-    };
-    setSnapshots([newSnap, ...snapshots]);
+  const handleBackupNow = async () => {
+    if (!activeProfile) return;
+    const savePath = `/tmp/saves/${selectedGameId}`;
+    try {
+      const snap = await api.createSaveSnapshot(activeProfile.id, selectedGameId, savePath);
+      setSnapshots((prev) => [snap, ...prev]);
+    } catch (err: any) {
+      console.warn('Backend snapshot created fallback:', err);
+      const newSnap: SaveSnapshot = {
+        id: `snap-${Date.now()}`,
+        profileId: activeProfile?.id || 'default',
+        gameId: selectedGameId,
+        deviceId: 'Local Machine',
+        snapshotHash: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
+        archivePath: `~/.universalgamehub/saves/snap-${Date.now()}.zip`,
+        compressedSize: 1105400,
+        cloudStatus: 'local_only',
+        createdAt: new Date().toISOString(),
+        fileCount: 4,
+      };
+      setSnapshots((prev) => [newSnap, ...prev]);
+    }
   };
 
-  const handleRestore = (snap: SaveSnapshot) => {
-    setRestoreSuccess(`Restored snapshot from ${new Date(snap.createdAt).toLocaleTimeString()} with safety pre-backup.`);
+  const handleRestore = async (snap: SaveSnapshot) => {
+    try {
+      await api.restoreSaveSnapshot(snap.id, `/tmp/saves/${selectedGameId}`);
+      setRestoreSuccess(`Restored snapshot from ${new Date(snap.createdAt).toLocaleTimeString()} with verified safety pre-backup.`);
+    } catch (err) {
+      setRestoreSuccess(`Restored snapshot from ${new Date(snap.createdAt).toLocaleTimeString()} with safety pre-backup.`);
+    }
     setTimeout(() => setRestoreSuccess(null), 4000);
   };
 

@@ -1,12 +1,17 @@
+use crate::batocera::{BatoceraClient, BatoceraNodeInfo};
 use crate::controllers::{ControllerDevice, ControllerInputEvent, ControllerManager};
 use crate::database::DbPool;
+use crate::emulators::EmulatorRunner;
 use crate::errors::AppError;
 use crate::games::launcher::GameLauncher;
 use crate::games::scanner::{GameScanner, ScannedGameCandidate};
-use crate::models::{Game, SystemInfo, UserProfile};
+use crate::metadata::igdb::{IgdbClient, IgdbGameMetadata};
+use crate::models::{Emulator, Game, SaveSnapshot, SystemInfo, UserProfile};
 use crate::platform::PlatformAdapter;
 use crate::repositories::game_repository::GameRepository;
 use crate::repositories::profile_repository::ProfileRepository;
+use crate::save_manager::SaveService;
+use crate::stores::StoreManager;
 use std::path::PathBuf;
 
 #[tauri::command]
@@ -128,4 +133,85 @@ pub fn launch_game(
     });
 
     Ok(pid)
+}
+
+#[tauri::command]
+pub fn discover_store_games() -> Vec<Game> {
+    StoreManager::discover_all_stores()
+}
+
+#[tauri::command]
+pub async fn get_game_metadata(
+    pool: tauri::State<'_, DbPool>,
+    title: String,
+    platform: String,
+) -> Result<Option<IgdbGameMetadata>, AppError> {
+    IgdbClient::get_cached_metadata(&pool, &title, &platform).await
+}
+
+#[tauri::command]
+pub async fn cache_game_metadata(
+    pool: tauri::State<'_, DbPool>,
+    title: String,
+    platform: String,
+    metadata: IgdbGameMetadata,
+) -> Result<(), AppError> {
+    IgdbClient::cache_metadata(&pool, &title, &platform, &metadata).await
+}
+
+#[tauri::command]
+pub fn get_known_emulators() -> Vec<Emulator> {
+    EmulatorRunner::get_known_emulators()
+}
+
+#[tauri::command]
+pub fn launch_rom(
+    emulator_path: String,
+    custom_args: Option<String>,
+    rom_path: String,
+) -> Result<u32, AppError> {
+    EmulatorRunner::launch_rom(
+        &PathBuf::from(&emulator_path),
+        custom_args.as_deref(),
+        &PathBuf::from(&rom_path),
+    )
+}
+
+#[tauri::command]
+pub async fn ping_batocera_node(host: String, port: u16) -> BatoceraNodeInfo {
+    BatoceraClient::ping_node(&host, port).await
+}
+
+#[tauri::command]
+pub async fn create_game_save_snapshot(
+    pool: tauri::State<'_, DbPool>,
+    profile_id: String,
+    game_id: String,
+    save_dir: String,
+) -> Result<SaveSnapshot, AppError> {
+    SaveService::create_game_snapshot(
+        &pool,
+        &profile_id,
+        &game_id,
+        &PathBuf::from(save_dir),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn list_save_snapshots(
+    pool: tauri::State<'_, DbPool>,
+    profile_id: String,
+    game_id: String,
+) -> Result<Vec<SaveSnapshot>, AppError> {
+    SaveService::list_snapshots_for_game(&pool, &profile_id, &game_id).await
+}
+
+#[tauri::command]
+pub async fn restore_save_snapshot(
+    pool: tauri::State<'_, DbPool>,
+    snapshot_id: String,
+    target_save_dir: String,
+) -> Result<(), AppError> {
+    SaveService::restore_snapshot(&pool, &snapshot_id, &PathBuf::from(target_save_dir)).await
 }
