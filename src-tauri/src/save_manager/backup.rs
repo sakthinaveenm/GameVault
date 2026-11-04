@@ -37,7 +37,7 @@ impl SaveBackup {
             let path = entry.path();
             if path.is_file() {
                 if let Ok(rel) = path.strip_prefix(source_dir) {
-                    let rel_str = rel.to_string_lossy().to_string();
+                    let rel_str = rel.to_string_lossy().replace('\\', "/");
                     zip.start_file(&rel_str, options).map_err(|e| {
                         AppError::SaveManager(format!("Zip packing error: {}", e))
                     })?;

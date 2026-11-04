@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Game, GameSource, PlatformType } from '@/types';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { api } from '@/services/tauri';
 import { PlusCircle, X, FolderOpen, Gamepad2 } from 'lucide-react';
 
 interface AddGameModalProps {
@@ -13,10 +14,24 @@ export const AddGameModal: React.FC<AddGameModalProps> = ({ isOpen, onClose }) =
 
   const [title, setTitle] = useState('');
   const [source, setSource] = useState<GameSource>('local');
-  const [platform, setPlatform] = useState<PlatformType>('macos');
+  const [platform, setPlatform] = useState<PlatformType>('windows');
   const [executablePath, setExecutablePath] = useState('');
   const [developer, setDeveloper] = useState('');
   const [summary, setSummary] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    api.getSystemInfo().then((info) => {
+      const os = (info.os || 'windows').toLowerCase();
+      if (os.includes('win')) {
+        setPlatform('windows');
+      } else if (os.includes('mac')) {
+        setPlatform('macos');
+      } else if (os.includes('linux')) {
+        setPlatform('linux');
+      }
+    });
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

@@ -52,6 +52,20 @@ export interface PkceSessionDto {
 }
 
 export const api = {
+  getSystemInfo: async (): Promise<{ os: string; arch: string; appVersion: string; appDataDir: string }> => {
+    if (isTauriEnvironment()) {
+      return await invoke('get_system_info');
+    }
+    const isWin = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('win');
+    const isMac = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac');
+    return {
+      os: isWin ? 'windows' : isMac ? 'macos' : 'linux',
+      arch: 'x86_64',
+      appVersion: '0.1.1',
+      appDataDir: './data',
+    };
+  },
+
   ping: async (): Promise<string> => {
     if (isTauriEnvironment()) {
       return await invoke<string>('ping');

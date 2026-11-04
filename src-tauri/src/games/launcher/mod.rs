@@ -17,13 +17,100 @@ impl GameLauncher {
         args: &[String],
         working_dir: Option<&Path>,
     ) -> AppResult<Child> {
+        let path_str = executable_path.to_string_lossy();
+
+        // 1. Support URL / Store Protocol Launching (e.g. steam://rungameid/..., com.epicgames.launcher://...)
+        let is_protocol = path_str.starts_with("steam://")
+            || path_str.starts_with("com.epicgames.launcher://")
+            || path_str.starts_with("http://")
+            || path_str.starts_with("https://");
+
+        if is_protocol {
+            #[cfg(target_os = "windows")]
+            {
+                let mut cmd = Command::new("cmd");
+                cmd.args(["/c", "start", "", &path_str]);
+                return cmd.spawn().map_err(|e| {
+                    AppError::ProcessLaunch(format!("Failed to launch store protocol: {}", e))
+                });
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let mut cmd = Command::new("open");
+                cmd.arg(&*path_str);
+                return cmd.spawn().map_err(|e| {
+                    AppError::ProcessLaunch(format!("Failed to launch store protocol: {}", e))
+                });
+            }
+            #[cfg(target_os = "linux")]
+            {
+                let mut cmd = Command::new("xdg-open");
+                cmd.arg(&*path_str);
+                return cmd.spawn().map_err(|e| {
+                    AppError::ProcessLaunch(format!("Failed to launch store protocol: {}", e))
+                });
+            }
+        }
+
+        // Check if executable exists on filesystem
         if !executable_path.exists() {
+            // Check if first argument is a protocol scheme as fallback
+            if let Some(first_arg) = args.first() {
+                if first_arg.starts_with("steam://") || first_arg.starts_with("com.epicgames.launcher://") {
+                    #[cfg(target_os = "windows")]
+                    {
+                        let mut cmd = Command::new("cmd");
+                        cmd.args(["/c", "start", "", first_arg]);
+                        return cmd.spawn().map_err(|e| AppError::ProcessLaunch(e.to_string()));
+                    }
+                    #[cfg(target_os = "macos")]
+                    {
+                        let mut cmd = Command::new("open");
+                        cmd.arg(first_arg);
+                        return cmd.spawn().map_err(|e| AppError::ProcessLaunch(e.to_string()));
+                    }
+                    #[cfg(target_os = "linux")]
+                    {
+                        let mut cmd = Command::new("xdg-open");
+                        cmd.arg(first_arg);
+                        return cmd.spawn().map_err(|e| AppError::ProcessLaunch(e.to_string()));
+                    }
+                }
+            }
+
             return Err(AppError::ProcessLaunch(format!(
                 "Executable file not found: {}",
                 executable_path.display()
             )));
         }
 
+        // 2. macOS .app bundle directory execution via `open`
+        #[cfg(target_os = "macos")]
+        {
+            if executable_path.is_dir()
+                && executable_path
+                    .extension()
+                    .map_or(false, |ext| ext.eq_ignore_ascii_case("app"))
+            {
+                let mut cmd = Command::new("open");
+                cmd.arg(executable_path);
+                if !args.is_empty() {
+                    cmd.arg("--args");
+                    cmd.args(args);
+                }
+                cmd.stdout(Stdio::null());
+                cmd.stderr(Stdio::null());
+                return cmd.spawn().map_err(|e| {
+                    AppError::ProcessLaunch(format!(
+                        "Failed to launch macOS bundle '{}': {}",
+                        executable_path.display(),
+                        e
+                    ))
+                });
+            }
+        }
+
+        // 3. Standard executable process launch
         let mut cmd = Command::new(executable_path);
         cmd.args(args);
 

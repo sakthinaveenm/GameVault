@@ -73,7 +73,7 @@ export const ProfilesScreen: React.FC = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-black shadow-lg">
-                      {p.displayName.charAt(0).toUpperCase()}
+                      {p.displayName ? p.displayName.charAt(0).toUpperCase() : 'P'}
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-slate-100 flex items-center">

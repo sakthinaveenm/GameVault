@@ -47,7 +47,7 @@ impl SaveHasher {
             let path = entry.path();
             if path.is_file() {
                 if let Ok(rel) = path.strip_prefix(dir) {
-                    let rel_str = rel.to_string_lossy().to_string();
+                    let rel_str = rel.to_string_lossy().replace('\\', "/");
                     let file_hash = Self::hash_file(path)?;
                     let size = entry.metadata()?.len();
 

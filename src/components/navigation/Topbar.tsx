@@ -94,7 +94,7 @@ export const Topbar: React.FC = () => {
           className="flex items-center space-x-2.5 pl-2 pr-3 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl transition-all"
         >
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-md">
-            {activeProfile?.displayName.charAt(0).toUpperCase() || <User className="w-4 h-4" />}
+            {activeProfile?.displayName ? activeProfile.displayName.charAt(0).toUpperCase() : <User className="w-4 h-4" />}
           </div>
           <div className="flex flex-col text-left">
             <span className="text-xs font-semibold text-slate-200 leading-tight">

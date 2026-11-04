@@ -23,12 +23,30 @@ export const ScanFoldersModal: React.FC<ScanFoldersModalProps> = ({
 }) => {
   const { addGame } = useLibraryStore();
 
-  const [scanDirectory, setScanDirectory] = useState('/Applications');
+  const [scanDirectory, setScanDirectory] = useState('');
+  const [hostOs, setHostOs] = useState<'windows' | 'macos' | 'linux'>('windows');
   const [isScanning, setIsScanning] = useState(false);
   const [scanCompleted, setScanCompleted] = useState(false);
   const [detectedItems, setDetectedItems] = useState<
-    { title: string; path: string; selected: boolean }[]
+    { title: string; path: string; platform: string; selected: boolean }[]
   >([]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    api.getSystemInfo().then((info) => {
+      const os = (info.os || 'windows').toLowerCase();
+      if (os.includes('win')) {
+        setHostOs('windows');
+        setScanDirectory('C:\\Games');
+      } else if (os.includes('mac')) {
+        setHostOs('macos');
+        setScanDirectory('/Applications');
+      } else {
+        setHostOs('linux');
+        setScanDirectory('/usr/share/applications');
+      }
+    });
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -43,19 +61,15 @@ export const ScanFoldersModal: React.FC<ScanFoldersModalProps> = ({
           results.map((r) => ({
             title: r.title,
             path: r.executable_path,
+            platform: r.platform || hostOs,
             selected: true,
           }))
         );
       } else {
-        setDetectedItems([
-          { title: 'OpenTTD', path: '/Applications/OpenTTD.app', selected: true },
-          { title: 'SuperTuxKart', path: '/Applications/SuperTuxKart.app', selected: true },
-        ]);
+        setDetectedItems([]);
       }
     } catch {
-      setDetectedItems([
-        { title: 'OpenTTD', path: '/Applications/OpenTTD.app', selected: true },
-      ]);
+      setDetectedItems([]);
     } finally {
       setIsScanning(false);
       setScanCompleted(true);
@@ -70,7 +84,7 @@ export const ScanFoldersModal: React.FC<ScanFoldersModalProps> = ({
           id: `scanned-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           title: item.title,
           source: 'local',
-          platform: 'macos',
+          platform: (item.platform as any) || hostOs,
           executablePath: item.path,
           installed: true,
           isFavorite: false,
