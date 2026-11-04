@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Game, GameSource, PlatformType } from '@/types';
+import { api } from '@/services/tauri';
 
 export type SortOption = 'name' | 'playtime' | 'lastPlayed' | 'releaseDate';
 
@@ -12,17 +13,19 @@ interface LibraryState {
   onlyInstalled: boolean;
   onlyFavorites: boolean;
   sortBy: SortOption;
+  loadGamesFromDb: (profileId: string) => Promise<void>;
   setGames: (games: Game[]) => void;
-  addGame: (game: Game) => void;
+  addGame: (game: Game) => Promise<void>;
   updateGame: (id: string, updates: Partial<Game>) => void;
-  removeGame: (id: string) => void;
+  removeGame: (id: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
   setSourceFilter: (source: GameSource | 'all') => void;
   setPlatformFilter: (platform: PlatformType | 'all') => void;
   toggleOnlyInstalled: () => void;
   toggleOnlyFavorites: () => void;
   setSortBy: (sort: SortOption) => void;
-  toggleFavorite: (id: string) => void;
+  toggleFavorite: (id: string, profileId?: string) => Promise<void>;
+  recordPlaytime: (id: string, minutes: number, profileId?: string) => Promise<void>;
 }
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
@@ -35,19 +38,43 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   onlyFavorites: false,
   sortBy: 'name',
 
+  loadGamesFromDb: async (profileId: string) => {
+    try {
+      const list = await api.listGames(profileId);
+      if (list && list.length > 0) {
+        set({ games: list });
+      }
+    } catch (e) {
+      console.warn('Could not load games from DB:', e);
+    }
+  },
+
   setGames: (games) => set({ games }),
 
-  addGame: (game) => set((state) => ({ games: [...state.games, game] })),
+  addGame: async (game) => {
+    set((state) => ({ games: [...state.games, game] }));
+    try {
+      await api.upsertGame(game);
+    } catch (e) {
+      console.warn('Failed to upsert game to DB:', e);
+    }
+  },
 
   updateGame: (id, updates) =>
     set((state) => ({
       games: state.games.map((g) => (g.id === id ? { ...g, ...updates } : g)),
     })),
 
-  removeGame: (id) =>
+  removeGame: async (id) => {
     set((state) => ({
       games: state.games.filter((g) => g.id !== id),
-    })),
+    }));
+    try {
+      await api.deleteGame(id);
+    } catch (e) {
+      console.warn('Failed to delete game from DB:', e);
+    }
+  },
 
   setSearchQuery: (query) => set({ searchQuery: query }),
 
@@ -61,12 +88,38 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   setSortBy: (sortBy) => set({ sortBy }),
 
-  toggleFavorite: (id) => {
+  toggleFavorite: async (id, profileId) => {
     const { games } = get();
     const game = games.find((g) => g.id === id);
     if (game) {
-      get().updateGame(id, { isFavorite: !game.isFavorite });
+      const newFav = !game.isFavorite;
+      get().updateGame(id, { isFavorite: newFav });
+      if (profileId) {
+        try {
+          await api.toggleFavorite(profileId, id, newFav);
+        } catch (e) {
+          console.warn('Failed to toggle favorite in DB:', e);
+        }
+      }
+    }
+  },
+
+  recordPlaytime: async (id, minutes, profileId) => {
+    const { games } = get();
+    const game = games.find((g) => g.id === id);
+    if (game) {
+      const updatedTime = (game.playtimeMinutes || 0) + minutes;
+      get().updateGame(id, {
+        playtimeMinutes: updatedTime,
+        lastPlayedAt: new Date().toISOString(),
+      });
+      if (profileId) {
+        try {
+          await api.recordPlaytime(profileId, id, minutes);
+        } catch (e) {
+          console.warn('Failed to record playtime in DB:', e);
+        }
+      }
     }
   },
 }));
-

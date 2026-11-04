@@ -33,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'cloud', label: 'Cloud & Sync', icon: Cloud },
   { id: 'profiles', label: 'Profiles', icon: Users },
   { id: 'statistics', label: 'Statistics', icon: BarChart2 },
+  { id: 'controllers', label: 'Controllers', icon: Gamepad2 },
   { id: 'downloads', label: 'Downloads', icon: Download },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];

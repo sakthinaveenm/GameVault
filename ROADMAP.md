@@ -4,7 +4,7 @@
 
 | Metric | Status |
 |---|---|
-| **Current Phase** | Phase 1 (Application Foundation & Console UI) Completed -> Proceeding to Phase 2 (Controller Subsystem) |
+| **Current Phase** | Phase 4 Completed -> Proceeding to Phase 5 (IGDB Metadata) & Phase 6 (Game Store Integrations) |
 | **Build Status** | Compiling Cleanly (Frontend Vite + Rust Backend 0 errors) |
 | **Backend Toolchain** | Rust 1.99.1, Cargo 1.99.1, Tauri 2 |
 | **Frontend Toolchain** | React 19, TypeScript 6, Vite 8, Tailwind CSS, Zustand |
@@ -28,27 +28,32 @@
 ### Phase 1: Application Foundation & Console UI (Completed)
 - [x] Configure Tailwind CSS v4 gaming theme (deep charcoal `#0b0e14`, subtle neon accents, focus rings).
 - [x] Implement Application Shell with collapsible sidebar and controller-optimized topbar.
-- [x] Implement Main Navigation routes & screen views:
-  - Home Dashboard (`HomeScreen.tsx`)
-  - My Games / Unified Library (`LibraryScreen.tsx`)
-  - Retro Games (`RetroScreen.tsx`)
-  - Emulators (`EmulatorsScreen.tsx`)
-  - Batocera Integration (`BatoceraScreen.tsx`)
-  - Save Manager (`SaveManagerScreen.tsx`)
-  - Cloud & Sync (`CloudSyncScreen.tsx`)
-  - Profiles (`ProfilesScreen.tsx`)
-  - Statistics (`StatisticsScreen.tsx`)
-  - Downloads (`DownloadsScreen.tsx`)
-  - Settings (`SettingsScreen.tsx`)
-- [x] Implement reusable UI components:
-  - Focusable GameCard with source badges, playtime, and favorite toggle
-  - Controller button hints bar (A: Select, B: Back, X: Action, Y: Options, LB/RB: Switch Tab)
-  - Quick Menu overlay (accessible via Start/Escape)
-  - Game Details modal with launch parameters and safety confirmation for removal
-  - Scan Folders modal with executable confirmation
-  - Add Custom Game modal
-- [x] Establish Rust backend domain models (`Game`, `UserProfile`, `SaveSnapshot`, `Emulator`, `SystemInfo`) and error types.
-- [x] Verify frontend build (`tsc && vite build`: 0 errors) and backend test suite (`cargo test`: 5 tests passing).
+- [x] Implement Main Navigation routes & screen views (Home, Library, Retro, Emulators, Batocera, Saves, Cloud, Profiles, Statistics, Downloads, Settings).
+- [x] Implement reusable UI components (Focusable GameCard, Hints bar, Quick Menu, Game Details modal, Scan Folders modal, Add Custom Game modal).
+
+### Phase 2: Controller Subsystem & Native Input Integration (Completed)
+- [x] Implemented native controller manager using `gilrs` in Rust (`src-tauri/src/controllers/mod.rs`).
+- [x] Implemented controller visualizer and calibration tester (`ControllerSettingsScreen.tsx`).
+- [x] Implemented real-time face button, bumper, and analog stick coordinate tracking.
+- [x] Implemented configurable dead-zone filter and haptic rumble testing trigger.
+- [x] Gamepad navigation hook (`useControllerNavigation`) with keyboard fallback.
+- [x] Automated unit test for Gilrs controller subsystem.
+
+### Phase 3: Local SQLite Database & Profiles (Completed)
+- [x] Initialized SQLx with SQLite connection pool and automatic startup schema migrations.
+- [x] Authored comprehensive initial migration (`0001_initial_schema.sql`) covering UserProfiles, Games, Saves, Emulators, CloudFiles, Conflicts, Downloads, and MetadataCache.
+- [x] Implemented `ProfileRepository` with full CRUD, default profile creation, and safety check preventing deletion of the last profile.
+- [x] Implemented profile-specific data isolation for favorites, playtime, and settings (`profile_game_data`).
+- [x] Registered Tauri commands (`list_profiles`, `create_profile`, `delete_profile`).
+- [x] In-memory SQLite migration and repository tests passing (8 tests).
+
+### Phase 4: Local Game Library & Process Launcher (Completed)
+- [x] Implemented recursive file system game scanner using `walkdir` (`src-tauri/src/games/scanner/`).
+- [x] Added candidate detection for `.app`, `.exe`, and retro ROM extensions with file deduplication.
+- [x] Implemented safe process launcher (`src-tauri/src/games/launcher/`) using argument vectors (never shell interpolation) and lifecycle monitoring.
+- [x] Implemented `GameRepository` with upsert, profile-scoped listing, favorite toggling, and playtime tracking.
+- [x] Connected frontend `ScanFoldersModal` to native `scan_directory_for_games` command with candidate confirmation.
+- [x] Added automated unit tests for game scanner, process launcher, and game repository (12 backend tests passing).
 
 ### Phase 2: Controller Subsystem
 - [ ] Gamepad API connection / disconnection listener.

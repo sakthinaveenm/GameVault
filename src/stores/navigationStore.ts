@@ -27,6 +27,7 @@ const TABS: NavigationTab[] = [
   'cloud',
   'profiles',
   'statistics',
+  'controllers',
   'downloads',
   'settings',
 ];

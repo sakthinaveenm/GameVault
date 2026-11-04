@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { useProfileStore } from '@/stores/profileStore';
 import { useControllerNavigation } from '@/hooks/useControllerNavigation';
+import { api } from '@/services/tauri';
 import { Game } from '@/types';
 
 import { Sidebar } from '@/components/navigation/Sidebar';
@@ -21,6 +23,7 @@ import { SaveManagerScreen } from '@/features/save-manager/SaveManagerScreen';
 import { CloudSyncScreen } from '@/features/cloud-sync/CloudSyncScreen';
 import { ProfilesScreen } from '@/features/profiles/ProfilesScreen';
 import { StatisticsScreen } from '@/features/statistics/StatisticsScreen';
+import { ControllerSettingsScreen } from '@/features/controller/ControllerSettingsScreen';
 import { DownloadsScreen } from '@/features/downloads/DownloadsScreen';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
 
@@ -29,19 +32,28 @@ export const MainLayout: React.FC = () => {
   useControllerNavigation();
 
   const { currentTab } = useNavigationStore();
-  const { games, updateGame } = useLibraryStore();
+  const { games, recordPlaytime } = useLibraryStore();
+  const { activeProfile } = useProfileStore();
 
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
 
-  const handleLaunchGame = (game: Game) => {
-    // Record last played date & mock playtime addition
-    updateGame(game.id, {
-      lastPlayedAt: new Date().toISOString(),
-      playtimeMinutes: (game.playtimeMinutes || 0) + 15,
-    });
-    alert(`Launching ${game.title} via ${game.source.toUpperCase()} runner...`);
+  const handleLaunchGame = async (game: Game) => {
+    if (game.executablePath) {
+      try {
+        const args = game.launchArguments
+          ? game.launchArguments.split(' ').filter(Boolean)
+          : [];
+        await api.launchGame(game.executablePath, args);
+        recordPlaytime(game.id, 5, activeProfile?.id);
+      } catch (err: any) {
+        alert(`Failed to launch ${game.title}: ${err?.message || err}`);
+      }
+    } else {
+      alert(`Launching ${game.title} via official ${game.source.toUpperCase()} client protocol...`);
+      recordPlaytime(game.id, 5, activeProfile?.id);
+    }
   };
 
   const renderActiveScreen = () => {
@@ -70,6 +82,8 @@ export const MainLayout: React.FC = () => {
         return <ProfilesScreen />;
       case 'statistics':
         return <StatisticsScreen />;
+      case 'controllers':
+        return <ControllerSettingsScreen />;
       case 'downloads':
         return <DownloadsScreen />;
       case 'settings':

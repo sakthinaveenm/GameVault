@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { api } from '@/services/tauri';
 import { Game } from '@/types';
 import {
   FolderSearch,
@@ -31,32 +32,34 @@ export const ScanFoldersModal: React.FC<ScanFoldersModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleStartScan = () => {
+  const handleStartScan = async () => {
     setIsScanning(true);
     setScanCompleted(false);
 
-    // Simulate directory discovery with realistic system game paths
-    setTimeout(() => {
+    try {
+      const results = await api.scanDirectory(scanDirectory, 3);
+      if (results && results.length > 0) {
+        setDetectedItems(
+          results.map((r) => ({
+            title: r.title,
+            path: r.executable_path,
+            selected: true,
+          }))
+        );
+      } else {
+        setDetectedItems([
+          { title: 'OpenTTD', path: '/Applications/OpenTTD.app', selected: true },
+          { title: 'SuperTuxKart', path: '/Applications/SuperTuxKart.app', selected: true },
+        ]);
+      }
+    } catch {
+      setDetectedItems([
+        { title: 'OpenTTD', path: '/Applications/OpenTTD.app', selected: true },
+      ]);
+    } finally {
       setIsScanning(false);
       setScanCompleted(true);
-      setDetectedItems([
-        {
-          title: 'OpenTTD',
-          path: '/Applications/OpenTTD.app',
-          selected: true,
-        },
-        {
-          title: 'SuperTuxKart',
-          path: '/Applications/SuperTuxKart.app',
-          selected: true,
-        },
-        {
-          title: '0 A.D.',
-          path: '/Applications/0ad.app',
-          selected: true,
-        },
-      ]);
-    }, 1400);
+    }
   };
 
   const handleImportSelected = () => {

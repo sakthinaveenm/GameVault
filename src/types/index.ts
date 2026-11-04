@@ -127,6 +127,7 @@ export type NavigationTab =
   | 'cloud'
   | 'profiles'
   | 'statistics'
+  | 'controllers'
   | 'downloads'
   | 'settings';
 

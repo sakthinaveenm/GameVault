@@ -18,10 +18,10 @@ export const ProfilesScreen: React.FC = () => {
   const [newProfileName, setNewProfileName] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProfileName.trim()) return;
-    const created = createProfile(newProfileName.trim());
+    const created = await createProfile(newProfileName.trim());
     setActiveProfile(created);
     setNewProfileName('');
     setShowCreateModal(false);
