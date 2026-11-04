@@ -34,7 +34,7 @@ const TABS: NavigationTab[] = [
 
 export const useNavigationStore = create<NavigationState>((set, get) => ({
   currentTab: 'home',
-  sidebarExpanded: true,
+  sidebarExpanded: false,
   isFullscreen: false,
   selectedGameId: null,
   quickMenuOpen: false,
