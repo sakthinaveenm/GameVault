@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useControllerStore } from '@/stores/controllerStore';
 import { useNavigationStore } from '@/stores/navigationStore';
+import { api } from '@/services/tauri';
 import {
   Settings,
   Monitor,
@@ -11,23 +12,80 @@ import {
   Shield,
   Save,
   Check,
+  RotateCcw,
 } from 'lucide-react';
+
+const SETTINGS_STORAGE_KEY = 'ugh_app_settings';
 
 export const SettingsScreen: React.FC = () => {
   const { showHints, toggleHints } = useControllerStore();
   const { isFullscreen, toggleFullscreen } = useNavigationStore();
 
-  const [scanPath, setScanPath] = useState('~/Games');
-  const [romsPath, setRomsPath] = useState('~/ROMs');
+  const [scanPath, setScanPath] = useState('D:\\Games');
+  const [romsPath, setRomsPath] = useState('D:\\ROMs');
   const [deadzone, setDeadzone] = useState(0.25);
   const [backupDelay, setBackupDelay] = useState(5);
   const [retentionLimit, setRetentionLimit] = useState(10);
   const [autoSync, setAutoSync] = useState(true);
   const [saveConfirmation, setSaveConfirmation] = useState(false);
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.scanPath) setScanPath(parsed.scanPath);
+        if (parsed.romsPath) setRomsPath(parsed.romsPath);
+        if (typeof parsed.deadzone === 'number') setDeadzone(parsed.deadzone);
+        if (typeof parsed.backupDelay === 'number') setBackupDelay(parsed.backupDelay);
+        if (typeof parsed.retentionLimit === 'number') setRetentionLimit(parsed.retentionLimit);
+        if (typeof parsed.autoSync === 'boolean') setAutoSync(parsed.autoSync);
+      } else {
+        api.getDefaultGameDirectories().then((dirs) => {
+          if (dirs && dirs.length > 0) {
+            setScanPath(dirs[0]);
+          }
+        }).catch(() => {});
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
   const handleSave = () => {
+    try {
+      localStorage.setItem(
+        SETTINGS_STORAGE_KEY,
+        JSON.stringify({
+          scanPath,
+          romsPath,
+          deadzone,
+          backupDelay,
+          retentionLimit,
+          autoSync,
+        })
+      );
+    } catch (err) {
+      console.warn('Failed to persist settings:', err);
+    }
     setSaveConfirmation(true);
     setTimeout(() => setSaveConfirmation(false), 2500);
+  };
+
+  const handleResetDefaults = async () => {
+    try {
+      const dirs = await api.getDefaultGameDirectories();
+      const defaultScan = (dirs && dirs.length > 0) ? dirs[0] : 'C:\\Games';
+      setScanPath(defaultScan);
+    } catch {
+      setScanPath('C:\\Games');
+    }
+    setRomsPath('C:\\ROMs');
+    setDeadzone(0.25);
+    setBackupDelay(5);
+    setRetentionLimit(10);
+    setAutoSync(true);
+    localStorage.removeItem(SETTINGS_STORAGE_KEY);
   };
 
   return (
@@ -47,13 +105,22 @@ export const SettingsScreen: React.FC = () => {
             </div>
           </div>
 
-          <button
-            onClick={handleSave}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-500/25"
-          >
-            {saveConfirmation ? <Check className="w-4 h-4 text-white" /> : <Save className="w-4 h-4" />}
-            <span>{saveConfirmation ? 'Saved Settings' : 'Save Changes'}</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleResetDefaults}
+              className="flex items-center space-x-1.5 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all border border-slate-700"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Defaults</span>
+            </button>
+            <button
+              onClick={handleSave}
+              className="flex items-center space-x-2 px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-500/25"
+            >
+              {saveConfirmation ? <Check className="w-4 h-4 text-white" /> : <Save className="w-4 h-4" />}
+              <span>{saveConfirmation ? 'Saved Settings' : 'Save Changes'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -206,4 +273,3 @@ export const SettingsScreen: React.FC = () => {
     </div>
   );
 };
-

@@ -29,9 +29,22 @@ impl PlatformAdapter {
         }
         #[cfg(target_os = "windows")]
         {
-            dirs_list.push(PathBuf::from("C:\\Games"));
-            dirs_list.push(PathBuf::from("C:\\Program Files"));
-            dirs_list.push(PathBuf::from("C:\\Program Files (x86)"));
+            let candidates = [
+                PathBuf::from("D:\\Games"),
+                PathBuf::from("C:\\Games"),
+                PathBuf::from("E:\\Games"),
+                PathBuf::from("D:\\Launchers"),
+                PathBuf::from("C:\\Program Files"),
+                PathBuf::from("C:\\Program Files (x86)"),
+            ];
+            for p in &candidates {
+                if p.exists() {
+                    dirs_list.push(p.clone());
+                }
+            }
+            if dirs_list.is_empty() {
+                dirs_list.push(PathBuf::from("C:\\Games"));
+            }
         }
         #[cfg(target_os = "linux")]
         {

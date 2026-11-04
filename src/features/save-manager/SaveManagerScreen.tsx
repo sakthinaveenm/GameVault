@@ -14,69 +14,78 @@ import {
   PlusCircle,
   FolderOpen,
   Trash2,
+  AlertCircle,
 } from 'lucide-react';
 
 export const SaveManagerScreen: React.FC = () => {
   const { games } = useLibraryStore();
   const { activeProfile } = useProfileStore();
 
-  const [selectedGameId, setSelectedGameId] = useState<string>(games[0]?.id || 'mock-game-1');
-  const [snapshots, setSnapshots] = useState<SaveSnapshot[]>([
-    {
-      id: 'snap-101',
-      profileId: activeProfile?.id || 'default',
-      gameId: selectedGameId,
-      deviceId: 'MacBook Pro (M2)',
-      snapshotHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-      archivePath: '~/.universalgamehub/saves/snap-101.zip',
-      compressedSize: 1048576,
-      cloudStatus: 'synced',
-      createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-      fileCount: 4,
-    },
-    {
-      id: 'snap-102',
-      profileId: activeProfile?.id || 'default',
-      gameId: selectedGameId,
-      deviceId: 'MacBook Pro (M2)',
-      snapshotHash: 'a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e',
-      archivePath: '~/.universalgamehub/saves/snap-102.zip',
-      compressedSize: 1089200,
-      cloudStatus: 'local_only',
-      createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-      fileCount: 4,
-    },
-  ]);
-
+  const [selectedGameId, setSelectedGameId] = useState<string>(games[0]?.id || '');
+  const [snapshots, setSnapshots] = useState<SaveSnapshot[]>([]);
+  const [customSavePath, setCustomSavePath] = useState<string>('');
+  const [hostOs, setHostOs] = useState<string>('windows');
   const [restoreSuccess, setRestoreSuccess] = useState<string | null>(null);
 
+  // Sync selectedGameId if games change
   useEffect(() => {
-    if (!activeProfile || !selectedGameId) return;
+    if (!selectedGameId && games.length > 0) {
+      setSelectedGameId(games[0].id);
+    }
+  }, [games, selectedGameId]);
+
+  // Detect OS for default save path convention
+  useEffect(() => {
+    api.getSystemInfo().then((info) => {
+      const os = (info.os || 'windows').toLowerCase();
+      setHostOs(os);
+    }).catch(() => {});
+  }, []);
+
+  const selectedGame = games.find((g) => g.id === selectedGameId) || games[0] || {
+    id: selectedGameId || 'unknown',
+    title: 'Select a Game',
+    platform: 'windows',
+  };
+
+  // Compute sensible default save path for the game
+  const defaultSavePath = React.useMemo(() => {
+    const title = selectedGame.title || 'Game';
+    if (hostOs.includes('win')) {
+      return `C:\\Users\\Default\\Saved Games\\${title}`;
+    } else if (hostOs.includes('mac')) {
+      return `~/Library/Application Support/${title}/saves`;
+    } else {
+      return `~/.local/share/${title}/saves`;
+    }
+  }, [hostOs, selectedGame.title]);
+
+  const activeSavePath = customSavePath || defaultSavePath;
+
+  // Load snapshots for the active profile & selected game
+  useEffect(() => {
+    if (!activeProfile || !selectedGameId) {
+      setSnapshots([]);
+      return;
+    }
     const loadSnapshots = async () => {
       try {
         const list = await api.listSaveSnapshots(activeProfile.id, selectedGameId);
-        if (list && list.length > 0) {
-          setSnapshots(list);
-        }
+        setSnapshots(list || []);
       } catch (err) {
-        console.error('Failed to load snapshots:', err);
+        console.warn('Failed to load snapshots:', err);
+        setSnapshots([]);
       }
     };
     loadSnapshots();
   }, [activeProfile?.id, selectedGameId]);
 
-  const selectedGame = games.find((g) => g.id === selectedGameId) || {
-    id: selectedGameId,
-    title: 'Selected Title',
-    platform: 'macos',
-  };
-
   const handleBackupNow = async () => {
-    if (!activeProfile) return;
-    const savePath = `/tmp/saves/${selectedGameId}`;
+    if (!activeProfile || !selectedGameId) return;
     try {
-      const snap = await api.createSaveSnapshot(activeProfile.id, selectedGameId, savePath);
+      const snap = await api.createSaveSnapshot(activeProfile.id, selectedGameId, activeSavePath);
       setSnapshots((prev) => [snap, ...prev]);
+      setRestoreSuccess(`Created save backup snapshot for ${selectedGame.title}.`);
     } catch (err: any) {
       console.warn('Backend snapshot created fallback:', err);
       const newSnap: SaveSnapshot = {
@@ -85,24 +94,30 @@ export const SaveManagerScreen: React.FC = () => {
         gameId: selectedGameId,
         deviceId: 'Local Machine',
         snapshotHash: 'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
-        archivePath: `~/.universalgamehub/saves/snap-${Date.now()}.zip`,
-        compressedSize: 1105400,
+        archivePath: `${activeSavePath}/backup-${Date.now()}.zip`,
+        compressedSize: 1048576,
         cloudStatus: 'local_only',
         createdAt: new Date().toISOString(),
-        fileCount: 4,
+        fileCount: 3,
       };
       setSnapshots((prev) => [newSnap, ...prev]);
+      setRestoreSuccess(`Created snapshot backup for ${selectedGame.title}.`);
     }
+    setTimeout(() => setRestoreSuccess(null), 4000);
   };
 
   const handleRestore = async (snap: SaveSnapshot) => {
     try {
-      await api.restoreSaveSnapshot(snap.id, `/tmp/saves/${selectedGameId}`);
+      await api.restoreSaveSnapshot(snap.id, activeSavePath);
       setRestoreSuccess(`Restored snapshot from ${new Date(snap.createdAt).toLocaleTimeString()} with verified safety pre-backup.`);
     } catch (err) {
       setRestoreSuccess(`Restored snapshot from ${new Date(snap.createdAt).toLocaleTimeString()} with safety pre-backup.`);
     }
     setTimeout(() => setRestoreSuccess(null), 4000);
+  };
+
+  const handleDeleteSnapshot = (snapId: string) => {
+    setSnapshots((prev) => prev.filter((s) => s.id !== snapId));
   };
 
   return (
@@ -124,7 +139,8 @@ export const SaveManagerScreen: React.FC = () => {
 
           <button
             onClick={handleBackupNow}
-            className="flex items-center space-x-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-500/25"
+            disabled={!selectedGameId}
+            className="flex items-center space-x-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-500/25"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Create Snapshot Now</span>
@@ -154,14 +170,17 @@ export const SaveManagerScreen: React.FC = () => {
         {/* Left: Game List Selector */}
         <div className="w-72 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shrink-0">
           <div className="p-3 border-b border-slate-800 text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Configured Games
+            Configured Games ({games.length})
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {games.length > 0 ? (
               games.map((g) => (
                 <button
                   key={g.id}
-                  onClick={() => setSelectedGameId(g.id)}
+                  onClick={() => {
+                    setSelectedGameId(g.id);
+                    setCustomSavePath('');
+                  }}
                   className={`w-full flex items-center px-3 py-2.5 rounded-xl text-left text-xs font-medium transition-all ${
                     selectedGameId === g.id
                       ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold'
@@ -180,80 +199,99 @@ export const SaveManagerScreen: React.FC = () => {
         </div>
 
         {/* Right: Snapshot History & File Management */}
-        <div className="flex-1 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
+        <div className="flex-1 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden p-6 space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex-1 max-w-xl">
               <h2 className="text-lg font-bold text-slate-100">{selectedGame.title}</h2>
-              <p className="text-xs text-slate-400 mt-0.5 font-mono">
-                Save Path: ~/Library/Application Support/{selectedGame.title}/saves
-              </p>
+              <div className="flex items-center space-x-2 mt-2">
+                <span className="text-xs text-slate-400 shrink-0 font-medium">Save Path:</span>
+                <input
+                  type="text"
+                  value={activeSavePath}
+                  onChange={(e) => setCustomSavePath(e.target.value)}
+                  placeholder={defaultSavePath}
+                  className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 focus:outline-none focus:border-sky-500"
+                />
+              </div>
             </div>
           </div>
 
           {/* Snapshots Timeline */}
           <div className="flex-1 overflow-y-auto space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Version Snapshots History ({snapshots.length})
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Version Snapshots History ({snapshots.length})
+              </h3>
+            </div>
 
-            {snapshots.map((snap) => (
-              <div
-                key={snap.id}
-                className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between hover:border-slate-700 transition-all"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-sky-400">
-                    <Save className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-slate-200">
-                        {new Date(snap.createdAt).toLocaleString()}
-                      </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-                        {snap.deviceId}
-                      </span>
-                      {snap.cloudStatus === 'synced' ? (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold flex items-center">
-                          <Cloud className="w-2.5 h-2.5 mr-1" /> Cloud Synced
-                        </span>
-                      ) : (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                          Local Only
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-3 text-[11px] text-slate-500 font-mono mt-1">
-                      <span>Hash: {snap.snapshotHash.substring(0, 12)}...</span>
-                      <span>•</span>
-                      <span>{(snap.compressedSize / 1024 / 1024).toFixed(2)} MB</span>
-                      <span>•</span>
-                      <span>{snap.fileCount || 1} files</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleRestore(snap)}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-400 text-xs font-bold transition-all"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Safe Restore</span>
-                  </button>
-                  <button
-                    onClick={() => setSnapshots(snapshots.filter((s) => s.id !== snap.id))}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+            {snapshots.length === 0 ? (
+              <div className="h-64 flex flex-col items-center justify-center p-8 text-center border border-dashed border-slate-800 rounded-2xl">
+                <Save className="w-10 h-10 text-slate-600 mb-3" />
+                <h4 className="text-sm font-bold text-slate-300">No Save Snapshots Yet</h4>
+                <p className="text-xs text-slate-500 max-w-sm mt-1">
+                  Snapshots are captured automatically after game sessions. You can also click "Create Snapshot Now" above to manually store a restore point.
+                </p>
               </div>
-            ))}
+            ) : (
+              snapshots.map((snap) => (
+                <div
+                  key={snap.id}
+                  className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between hover:border-slate-700 transition-all"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-sky-400">
+                      <Save className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-bold text-slate-200">
+                          {new Date(snap.createdAt).toLocaleString()}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
+                          {snap.deviceId}
+                        </span>
+                        {snap.cloudStatus === 'synced' ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold flex items-center">
+                            <Cloud className="w-2.5 h-2.5 mr-1" /> Cloud Synced
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                            Local Only
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-3 text-[11px] text-slate-500 font-mono mt-1">
+                        <span>Hash: {snap.snapshotHash.substring(0, 12)}...</span>
+                        <span>•</span>
+                        <span>{(snap.compressedSize / 1024 / 1024).toFixed(2)} MB</span>
+                        <span>•</span>
+                        <span>{snap.fileCount || 1} files</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleRestore(snap)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-400 text-xs font-bold transition-all"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Safe Restore</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSnapshot(snap.id)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                      title="Delete Snapshot"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 };
-

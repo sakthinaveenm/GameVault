@@ -28,6 +28,14 @@ pub fn get_system_info() -> SystemInfo {
 }
 
 #[tauri::command]
+pub fn get_default_game_directories() -> Vec<String> {
+    PlatformAdapter::get_default_game_dirs()
+        .into_iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect()
+}
+
+#[tauri::command]
 pub fn ping() -> String {
     "pong".to_string()
 }

@@ -17,13 +17,17 @@ impl SteamDetector {
         }
         #[cfg(target_os = "windows")]
         {
-            let p1 = PathBuf::from("C:\\Program Files (x86)\\Steam");
-            if p1.exists() {
-                return Some(p1);
-            }
-            let p2 = PathBuf::from("C:\\Program Files\\Steam");
-            if p2.exists() {
-                return Some(p2);
+            let candidates = [
+                PathBuf::from("D:\\Launchers\\Steam"),
+                PathBuf::from("C:\\Program Files (x86)\\Steam"),
+                PathBuf::from("C:\\Program Files\\Steam"),
+                PathBuf::from("D:\\Steam"),
+                PathBuf::from("E:\\Steam"),
+            ];
+            for p in &candidates {
+                if p.exists() {
+                    return Some(p.clone());
+                }
             }
         }
         #[cfg(target_os = "linux")]
@@ -44,22 +48,45 @@ impl SteamDetector {
 
     pub fn discover_installed_games(steam_root: &Path) -> Vec<Game> {
         let mut games = Vec::new();
-        let steamapps = steam_root.join("steamapps");
-
-        if !steamapps.exists() {
-            return games;
+        let mut library_dirs = Vec::new();
+        let main_steamapps = steam_root.join("steamapps");
+        if main_steamapps.exists() {
+            library_dirs.push(main_steamapps.clone());
         }
 
-        // Parse appmanifest_*.acf files
-        if let Ok(entries) = fs::read_dir(&steamapps) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if let Some(file_name) = path.file_name() {
-                    let name_str = file_name.to_string_lossy();
-                    if name_str.starts_with("appmanifest_") && name_str.ends_with(".acf") {
-                        if let Ok(content) = fs::read_to_string(&path) {
-                            if let Some(game) = Self::parse_acf(&content, &steamapps) {
-                                games.push(game);
+        // Parse libraryfolders.vdf for any additional configured drive libraries
+        let vdf_path = main_steamapps.join("libraryfolders.vdf");
+        if vdf_path.exists() {
+            if let Ok(content) = fs::read_to_string(&vdf_path) {
+                for line in content.lines() {
+                    let line = line.trim();
+                    if line.starts_with("\"path\"") {
+                        if let Some(folder_path) = Self::extract_quoted_value(line) {
+                            let p = PathBuf::from(folder_path.replace("\\\\", "\\")).join("steamapps");
+                            if p.exists() && !library_dirs.contains(&p) {
+                                library_dirs.push(p);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Parse appmanifest_*.acf files across all discovered library folders
+        for steamapps in library_dirs {
+            if let Ok(entries) = fs::read_dir(&steamapps) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if let Some(file_name) = path.file_name() {
+                        let name_str = file_name.to_string_lossy();
+                        if name_str.starts_with("appmanifest_") && name_str.ends_with(".acf") {
+                            if let Ok(content) = fs::read_to_string(&path) {
+                                if let Some(game) = Self::parse_acf(&content, &steamapps) {
+                                    // Skip Steamworks redistributables runtime
+                                    if game.store_id.as_deref() != Some("228980") {
+                                        games.push(game);
+                                    }
+                                }
                             }
                         }
                     }

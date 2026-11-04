@@ -64,8 +64,19 @@ impl GameScanner {
             if let Some(ext) = path.extension() {
                 if ext.eq_ignore_ascii_case("exe") {
                     let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
-                    // Filter out unins/crash report helpers
-                    if !file_name.contains("unins") && !file_name.contains("crash") && !file_name.contains("helper") {
+                    let is_helper = file_name.contains("unins")
+                        || file_name.contains("crash")
+                        || file_name.contains("helper")
+                        || file_name.contains("redist")
+                        || file_name.contains("quicksfv")
+                        || file_name.contains("setup")
+                        || file_name.contains("dxwebsetup")
+                        || file_name.contains("installer")
+                        || file_name.contains("cleanup")
+                        || file_name.contains("uploader")
+                        || file_name.contains("handler")
+                        || file_name.contains("vcredist");
+                    if !is_helper {
                         return true;
                     }
                 }
@@ -87,13 +98,27 @@ impl GameScanner {
     }
 
     fn derive_title(path: &Path) -> String {
+        if let Some(parent) = path.parent() {
+            let p_name = parent.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let p_lower = p_name.to_lowercase();
+            if p_lower == "retail" || p_lower == "binaries" || p_lower == "win64" || p_lower == "bin" || p_lower == "x64" {
+                if let Some(gp) = parent.parent() {
+                    let gp_name = gp.file_name().unwrap_or_default().to_string_lossy().to_string();
+                    if !gp_name.is_empty() && gp_name != "Games" && gp_name != "common" {
+                        return gp_name;
+                    }
+                }
+            } else if !p_name.is_empty() && p_name != "Games" && p_name != "common" && !p_lower.contains("steam") {
+                return p_name;
+            }
+        }
+
         let stem = path
             .file_stem()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
 
-        // Clean up common file patterns
         stem.replace('_', " ").replace('-', " ")
     }
 

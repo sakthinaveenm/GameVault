@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Game, GameSource, PlatformType } from '@/types';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { api } from '@/services/tauri';
@@ -7,33 +7,65 @@ import { PlusCircle, X, FolderOpen, Gamepad2 } from 'lucide-react';
 interface AddGameModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialSource?: GameSource;
+  initialPlatform?: PlatformType;
 }
 
-export const AddGameModal: React.FC<AddGameModalProps> = ({ isOpen, onClose }) => {
+export const AddGameModal: React.FC<AddGameModalProps> = ({
+  isOpen,
+  onClose,
+  initialSource = 'local',
+  initialPlatform,
+}) => {
   const { addGame } = useLibraryStore();
 
   const [title, setTitle] = useState('');
-  const [source, setSource] = useState<GameSource>('local');
-  const [platform, setPlatform] = useState<PlatformType>('windows');
+  const [source, setSource] = useState<GameSource>(initialSource);
+  const [platform, setPlatform] = useState<PlatformType>(initialPlatform || 'windows');
   const [executablePath, setExecutablePath] = useState('');
   const [developer, setDeveloper] = useState('');
   const [summary, setSummary] = useState('');
+  const [hostOs, setHostOs] = useState('windows');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    api.getSystemInfo().then((info) => {
-      const os = (info.os || 'windows').toLowerCase();
-      if (os.includes('win')) {
-        setPlatform('windows');
-      } else if (os.includes('mac')) {
-        setPlatform('macos');
-      } else if (os.includes('linux')) {
-        setPlatform('linux');
-      }
-    });
-  }, [isOpen]);
+    if (initialSource) setSource(initialSource);
+    if (initialPlatform) {
+      setPlatform(initialPlatform);
+    } else {
+      api.getSystemInfo().then((info) => {
+        const os = (info.os || 'windows').toLowerCase();
+        setHostOs(os);
+        if (os.includes('win')) {
+          setPlatform('windows');
+        } else if (os.includes('mac')) {
+          setPlatform('macos');
+        } else if (os.includes('linux')) {
+          setPlatform('linux');
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen, initialSource, initialPlatform]);
 
   if (!isOpen) return null;
+
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const fullPath = (file as any).path || file.name;
+      setExecutablePath(fullPath);
+      if (!title.trim()) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, '');
+        setTitle(cleanName);
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,12 +88,23 @@ export const AddGameModal: React.FC<AddGameModalProps> = ({ isOpen, onClose }) =
     onClose();
   };
 
+  const pathPlaceholder = hostOs.includes('win')
+    ? 'D:\\Games\\Title\\game.exe or C:\\Games\\game.exe'
+    : '/Applications/Game.app or ~/Games/game';
+
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 select-none animate-fade-in">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl space-y-4"
       >
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
+
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
@@ -119,12 +162,15 @@ export const AddGameModal: React.FC<AddGameModalProps> = ({ isOpen, onClose }) =
                 onChange={(e) => setPlatform(e.target.value as PlatformType)}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-sky-500"
               >
-                <option value="macos">macOS (.app / binary)</option>
                 <option value="windows">Windows (.exe)</option>
+                <option value="macos">macOS (.app / binary)</option>
                 <option value="linux">Linux (ELF)</option>
                 <option value="snes">Super Nintendo (SNES)</option>
+                <option value="nes">NES</option>
+                <option value="genesis">Sega Genesis</option>
                 <option value="ps1">PlayStation 1</option>
                 <option value="ps2">PlayStation 2</option>
+                <option value="psp">PlayStation Portable (PSP)</option>
                 <option value="gamecube">Nintendo GameCube</option>
                 <option value="arcade">MAME / Arcade</option>
               </select>
@@ -138,12 +184,14 @@ export const AddGameModal: React.FC<AddGameModalProps> = ({ isOpen, onClose }) =
                 type="text"
                 value={executablePath}
                 onChange={(e) => setExecutablePath(e.target.value)}
-                placeholder="/Applications/Game.app or ~/Games/game.exe"
+                placeholder={pathPlaceholder}
                 className="flex-1 px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-sky-500"
               />
               <button
                 type="button"
-                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-300"
+                onClick={handleBrowseClick}
+                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-300 transition-colors"
+                title="Browse for file"
               >
                 <FolderOpen className="w-4 h-4" />
               </button>
@@ -193,4 +241,3 @@ export const AddGameModal: React.FC<AddGameModalProps> = ({ isOpen, onClose }) =
     </div>
   );
 };
-

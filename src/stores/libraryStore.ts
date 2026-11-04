@@ -42,13 +42,51 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   loadGamesFromDb: async (profileId?: string) => {
     const targetId = profileId || useProfileStore.getState().activeProfile?.id;
     if (!targetId) return;
+    set({ isLoading: true });
     try {
-      const list = await api.listGames(targetId);
+      let list = await api.listGames(targetId);
       if (list && list.length > 0) {
-        set({ games: list });
+        set({ games: list, isLoading: false });
+        return;
       }
+
+      // If library is currently empty, auto-discover installed Steam, Epic, and PC games
+      try {
+        const discoveredStores = await api.discoverStoreGames();
+        for (const g of discoveredStores) {
+          await api.upsertGame(g);
+        }
+      } catch (storeErr) {
+        console.warn('Store discovery note:', storeErr);
+      }
+
+      try {
+        const defaultDirs = await api.getDefaultGameDirectories();
+        for (const dir of defaultDirs) {
+          const candidates = await api.scanDirectory(dir, 3);
+          for (const c of candidates) {
+            const scannedGame: Game = {
+              id: `local-${c.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+              title: c.title,
+              source: 'local',
+              platform: (c.platform as any) || 'windows',
+              executablePath: c.executable_path,
+              installed: true,
+              isFavorite: false,
+              playtimeMinutes: 0,
+            };
+            await api.upsertGame(scannedGame);
+          }
+        }
+      } catch (dirErr) {
+        console.warn('Directory scan note:', dirErr);
+      }
+
+      list = await api.listGames(targetId);
+      set({ games: list || [], isLoading: false });
     } catch (e) {
       console.warn('Could not load games from DB:', e);
+      set({ isLoading: false });
     }
   },
 

@@ -25,7 +25,7 @@ impl BackupCrypto {
             .map_err(|e| format!("Read error: {}", e))?;
 
         // 96-bit nonce (12 bytes)
-        let nonce_bytes = [0x42u8; 12];
+        let rand_uuid = uuid::Uuid::new_v4(); let mut nonce_bytes = [0u8; 12]; nonce_bytes.copy_from_slice(&rand_uuid.as_bytes()[..12]);
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         let ciphertext = cipher

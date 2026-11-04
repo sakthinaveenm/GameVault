@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Emulator } from '@/types';
 import { api } from '@/services/tauri';
 import {
@@ -10,21 +10,23 @@ import {
   Check,
 } from 'lucide-react';
 
+const EMULATORS_OVERRIDE_KEY = 'ugh_emulators_overrides';
+
 const INITIAL_EMULATORS: Emulator[] = [
   {
     id: 'retroarch',
     name: 'RetroArch',
     systemId: 'multi',
-    executablePath: '/Applications/RetroArch.app',
-    supportedExtensions: ['nes', 'snes', 'bin', 'cue', 'chd', 'gba'],
-    defaultArguments: '-L cores/snes9x_libretro.dylib',
+    executablePath: 'C:\\RetroArch-Win64\\retroarch.exe',
+    supportedExtensions: ['nes', 'snes', 'sfc', 'gba', 'gbc', 'bin', 'cue'],
+    defaultArguments: '',
     detected: false,
   },
   {
     id: 'dolphin',
     name: 'Dolphin',
     systemId: 'gamecube_wii',
-    executablePath: '/Applications/Dolphin.app',
+    executablePath: 'C:\\Program Files\\Dolphin\\Dolphin.exe',
     supportedExtensions: ['iso', 'gcm', 'wbfs', 'ciso'],
     defaultArguments: '-b -e',
     detected: false,
@@ -33,44 +35,17 @@ const INITIAL_EMULATORS: Emulator[] = [
     id: 'pcsx2',
     name: 'PCSX2',
     systemId: 'ps2',
-    executablePath: '/Applications/PCSX2.app',
+    executablePath: 'C:\\Program Files\\PCSX2\\pcsx2-qtx64.exe',
     supportedExtensions: ['iso', 'bin', 'chd', 'gz'],
-    defaultArguments: '-nogui -fullscreen',
+    defaultArguments: '-nogui',
     detected: false,
   },
   {
     id: 'ppsspp',
     name: 'PPSSPP',
     systemId: 'psp',
-    executablePath: '/Applications/PPSSPP.app',
+    executablePath: 'C:\\Program Files\\PPSSPP\\PPSSPPWindows64.exe',
     supportedExtensions: ['iso', 'cso', 'pbp'],
-    defaultArguments: '--fullscreen',
-    detected: false,
-  },
-  {
-    id: 'duckstation',
-    name: 'DuckStation',
-    systemId: 'ps1',
-    executablePath: '/Applications/DuckStation.app',
-    supportedExtensions: ['cue', 'chd', 'bin', 'iso'],
-    defaultArguments: '-fullscreen',
-    detected: false,
-  },
-  {
-    id: 'rpcs3',
-    name: 'RPCS3',
-    systemId: 'ps3',
-    executablePath: '/Applications/RPCS3.app',
-    supportedExtensions: ['pkg', 'iso', 'eboot.bin'],
-    defaultArguments: '--no-gui',
-    detected: false,
-  },
-  {
-    id: 'mame',
-    name: 'MAME',
-    systemId: 'arcade',
-    executablePath: '/usr/local/bin/mame',
-    supportedExtensions: ['zip', '7z', 'chd'],
     defaultArguments: '',
     detected: false,
   },
@@ -82,17 +57,44 @@ export const EmulatorsScreen: React.FC = () => {
   const [editPath, setEditPath] = useState('');
   const [editArgs, setEditArgs] = useState('');
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const loadEmulators = async () => {
+      let emuList = INITIAL_EMULATORS;
       try {
         const detected = await api.getKnownEmulators();
         if (detected && detected.length > 0) {
-          setEmulators(detected);
+          emuList = detected;
         }
       } catch (err) {
-        console.error('Failed to load emulators from backend:', err);
+        console.warn('Failed to load emulators from backend:', err);
       }
+
+      // Apply any user overrides saved in localStorage
+      try {
+        const saved = localStorage.getItem(EMULATORS_OVERRIDE_KEY);
+        if (saved) {
+          const overrides: Record<string, { executablePath: string; defaultArguments?: string }> =
+            JSON.parse(saved);
+          emuList = emuList.map((e) => {
+            if (overrides[e.id]) {
+              return {
+                ...e,
+                executablePath: overrides[e.id].executablePath,
+                defaultArguments: overrides[e.id].defaultArguments ?? e.defaultArguments,
+              };
+            }
+            return e;
+          });
+        }
+      } catch {
+        // Ignore JSON error
+      }
+
+      setEmulators(emuList);
     };
+
     loadEmulators();
   }, []);
 
@@ -103,16 +105,44 @@ export const EmulatorsScreen: React.FC = () => {
   };
 
   const handleSaveEdit = (id: string) => {
-    setEmulators((prev) =>
-      prev.map((e) =>
-        e.id === id ? { ...e, executablePath: editPath, defaultArguments: editArgs } : e
-      )
+    const updated = emulators.map((e) =>
+      e.id === id ? { ...e, executablePath: editPath, defaultArguments: editArgs } : e
     );
+    setEmulators(updated);
     setEditingId(null);
+
+    // Save to localStorage
+    try {
+      const overrides: Record<string, { executablePath: string; defaultArguments?: string }> = {};
+      updated.forEach((e) => {
+        overrides[e.id] = {
+          executablePath: e.executablePath,
+          defaultArguments: e.defaultArguments,
+        };
+      });
+      localStorage.setItem(EMULATORS_OVERRIDE_KEY, JSON.stringify(overrides));
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const path = (file as any).path || file.name;
+      setEditPath(path);
+    }
   };
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFilePicked}
+        style={{ display: 'none' }}
+      />
+
       {/* Top Header */}
       <div className="px-8 pt-6 pb-4 bg-[#0b0e14] border-b border-slate-800/80">
         <div className="flex items-center space-x-3">
@@ -162,12 +192,12 @@ export const EmulatorsScreen: React.FC = () => {
                     {emu.detected ? (
                       <>
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Configured</span>
+                        <span>Detected</span>
                       </>
                     ) : (
                       <>
                         <XCircle className="w-3.5 h-3.5" />
-                        <span>Path Set</span>
+                        <span>Configured</span>
                       </>
                     )}
                   </div>
@@ -220,7 +250,12 @@ export const EmulatorsScreen: React.FC = () => {
                         onChange={(e) => setEditPath(e.target.value)}
                         className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 font-mono focus:outline-none focus:border-sky-500"
                       />
-                      <button className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-300">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-300 transition-colors"
+                        title="Browse for executable"
+                      >
                         <FolderOpen className="w-4 h-4" />
                       </button>
                     </div>
@@ -253,4 +288,3 @@ export const EmulatorsScreen: React.FC = () => {
     </div>
   );
 };
-

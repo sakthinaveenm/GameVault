@@ -51,8 +51,15 @@ export interface PkceSessionDto {
   state: string;
 }
 
+export interface SystemInfoDto {
+  os: string;
+  arch: string;
+  appVersion: string;
+  appDataDir: string;
+}
+
 export const api = {
-  getSystemInfo: async (): Promise<{ os: string; arch: string; appVersion: string; appDataDir: string }> => {
+  getSystemInfo: async (): Promise<SystemInfoDto> => {
     if (isTauriEnvironment()) {
       return await invoke('get_system_info');
     }
@@ -66,6 +73,13 @@ export const api = {
     };
   },
 
+
+  getDefaultGameDirectories: async (): Promise<string[]> => {
+    if (isTauriEnvironment()) {
+      return await invoke<string[]>('get_default_game_directories');
+    }
+    return ['D:\\Games', 'C:\\Games'];
+  },
   ping: async (): Promise<string> => {
     if (isTauriEnvironment()) {
       return await invoke<string>('ping');
@@ -248,15 +262,12 @@ export const api = {
       return await invoke<ProfileStatisticsDto>('get_profile_statistics', { profileId });
     }
     return {
-      total_playtime_minutes: 360,
-      total_games: 4,
-      installed_games: 3,
-      favorite_games: 2,
-      platform_breakdown: { pc: 2, steam: 1, snes: 1 },
-      top_played_games: [
-        { id: 'g1', title: 'Cyberpunk 2077', playtime_minutes: 240 },
-        { id: 'g2', title: 'Hades II', playtime_minutes: 120 },
-      ],
+      total_playtime_minutes: 0,
+      total_games: 0,
+      installed_games: 0,
+      favorite_games: 0,
+      platform_breakdown: {},
+      top_played_games: [],
     };
   },
 

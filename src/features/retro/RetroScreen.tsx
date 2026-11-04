@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { Game, PlatformType } from '@/types';
 import { GameCard } from '@/components/game-cards/GameCard';
+import { ScanFoldersModal } from '@/components/dialogs/ScanFoldersModal';
+import { AddGameModal } from '@/components/dialogs/AddGameModal';
 import { Tv, FolderSearch, Gamepad2, PlusCircle } from 'lucide-react';
 
 interface RetroScreenProps {
@@ -23,6 +25,8 @@ const RETRO_SYSTEMS: { id: PlatformType | 'all'; name: string; icon: string }[] 
 export const RetroScreen: React.FC<RetroScreenProps> = ({ onSelectGame }) => {
   const { games, toggleFavorite } = useLibraryStore();
   const [selectedSystem, setSelectedSystem] = useState<PlatformType | 'all'>('all');
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const retroGames = React.useMemo(() => {
     return games.filter((g) => {
@@ -64,11 +68,17 @@ export const RetroScreen: React.FC<RetroScreenProps> = ({ onSelectGame }) => {
           </div>
 
           <div className="flex items-center space-x-3">
-            <button className="flex items-center space-x-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 transition-all shadow-sm">
+            <button
+              onClick={() => setIsScanModalOpen(true)}
+              className="flex items-center space-x-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 transition-all shadow-sm"
+            >
               <FolderSearch className="w-4 h-4 text-amber-400" />
               <span>Scan ROM Directory</span>
             </button>
-            <button className="flex items-center space-x-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-md shadow-amber-500/20">
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-md shadow-amber-500/20"
+            >
               <PlusCircle className="w-4 h-4" />
               <span>Add ROM</span>
             </button>
@@ -118,10 +128,38 @@ export const RetroScreen: React.FC<RetroScreenProps> = ({ onSelectGame }) => {
                 Configure your emulator paths and scan your legal ROM folders to populate classic game libraries.
               </p>
             </div>
+            <div className="flex items-center space-x-3 pt-2">
+              <button
+                onClick={() => setIsScanModalOpen(true)}
+                className="flex items-center space-x-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700"
+              >
+                <FolderSearch className="w-3.5 h-3.5 text-amber-400" />
+                <span>Scan ROM Folder</span>
+              </button>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center space-x-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-md shadow-amber-500/20"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Add ROM File</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      <ScanFoldersModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+      />
+
+      <AddGameModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        initialSource="retro"
+        initialPlatform={selectedSystem !== 'all' ? selectedSystem : 'snes'}
+      />
     </div>
   );
 };
-

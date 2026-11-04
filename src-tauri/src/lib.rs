@@ -52,6 +52,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_system_info,
+            commands::get_default_game_directories,
             commands::ping,
             commands::list_controllers,
             commands::poll_controller_event,

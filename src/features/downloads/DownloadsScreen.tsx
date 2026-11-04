@@ -12,34 +12,21 @@ import {
   HardDrive,
   FileCheck,
   AlertTriangle,
+  Inbox,
 } from 'lucide-react';
 
 export const DownloadsScreen: React.FC = () => {
   const [urlInput, setUrlInput] = useState('');
   const [confirmInstallerPath, setConfirmInstallerPath] = useState<string | null>(null);
   const [executionMessage, setExecutionMessage] = useState<string | null>(null);
-  const [downloads, setDownloads] = useState<DownloadItem[]>([
-    {
-      id: 'dl-1',
-      title: 'FreeBSD Gaming Pack (Open-Source)',
-      sourceUrl: 'https://example.org/downloads/game-pack.zip',
-      destinationPath: '~/Downloads/game-pack.zip',
-      totalBytes: 524288000,
-      downloadedBytes: 314572800,
-      speedBytesPerSec: 4194304,
-      status: 'downloading',
-    },
-    {
-      id: 'dl-2',
-      title: 'OpenTTD (Transport Tycoon Deluxe Open Source)',
-      sourceUrl: 'https://example.org/openttd.zip',
-      destinationPath: '~/Downloads/openttd.zip',
-      totalBytes: 73400320,
-      downloadedBytes: 73400320,
-      speedBytesPerSec: 0,
-      status: 'completed',
-    },
-  ]);
+  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+  const [hostOs, setHostOs] = useState<string>('windows');
+
+  useEffect(() => {
+    api.getSystemInfo().then((info) => {
+      setHostOs((info.os || 'windows').toLowerCase());
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const loadDownloads = async () => {
@@ -60,7 +47,7 @@ export const DownloadsScreen: React.FC = () => {
           );
         }
       } catch (err) {
-        console.error('Failed to load downloads from SQLite:', err);
+        console.warn('Failed to load downloads from SQLite:', err);
       }
     };
     loadDownloads();
@@ -70,9 +57,11 @@ export const DownloadsScreen: React.FC = () => {
     e.preventDefault();
     if (!urlInput.trim()) return;
 
-    const filename = urlInput.split('/').pop() || 'download.bin';
-    const destinationPath = `~/Downloads/${filename}`;
-    const title = filename.replace(/\.[^/.]+$/, '');
+    const filename = urlInput.split('/').pop()?.split('?')[0] || `download-${Date.now()}.bin`;
+    const destinationPath = hostOs.includes('win')
+      ? `C:\\Users\\Default\\Downloads\\${filename}`
+      : `~/Downloads/${filename}`;
+    const title = filename.replace(/\.[^/.]+$/, '') || 'Direct Download';
 
     try {
       const queued = await api.queueDownload(title, urlInput.trim(), destinationPath);
@@ -86,7 +75,7 @@ export const DownloadsScreen: React.FC = () => {
         speedBytesPerSec: 0,
         status: 'queued',
       };
-      setDownloads([newDownload, ...downloads]);
+      setDownloads((prev) => [newDownload, ...prev]);
       setUrlInput('');
     } catch (err) {
       console.warn('Queue download fallback:', err);
@@ -100,7 +89,7 @@ export const DownloadsScreen: React.FC = () => {
         speedBytesPerSec: 0,
         status: 'queued',
       };
-      setDownloads([newDownload, ...downloads]);
+      setDownloads((prev) => [newDownload, ...prev]);
       setUrlInput('');
     }
   };
@@ -133,7 +122,7 @@ export const DownloadsScreen: React.FC = () => {
   };
 
   const removeDownload = (id: string) => {
-    setDownloads(downloads.filter((d) => d.id !== id));
+    setDownloads((prev) => prev.filter((d) => d.id !== id));
   };
 
   return (
@@ -147,7 +136,7 @@ export const DownloadsScreen: React.FC = () => {
           <div>
             <h1 className="text-2xl font-black text-slate-100 tracking-tight">Download Manager</h1>
             <p className="text-xs text-slate-400">
-              Download legal game packages and user-provided direct links with pause/resume and integrity verification.
+              Download game packages, patch updates, and direct media with pause/resume and integrity verification.
             </p>
           </div>
         </div>
@@ -171,14 +160,14 @@ export const DownloadsScreen: React.FC = () => {
           className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-3"
         >
           <label className="text-xs font-bold text-slate-200">
-            Add Legal Direct Download URL or Magnet Link
+            Add Direct Download URL or Package URI
           </label>
           <div className="flex items-center space-x-3">
             <input
               type="text"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="https://... or magnet:?xt=urn:btih:..."
+              placeholder="https://... (e.g. https://example.org/patch.zip)"
               className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-mono focus:outline-none focus:border-sky-500"
             />
             <button
@@ -187,7 +176,7 @@ export const DownloadsScreen: React.FC = () => {
               className="flex items-center space-x-1.5 px-5 py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-sky-500/25 transition-all"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>Start Download</span>
+              <span>Queue Download</span>
             </button>
           </div>
         </form>
@@ -198,92 +187,102 @@ export const DownloadsScreen: React.FC = () => {
             Download Tasks ({downloads.length})
           </h3>
 
-          {downloads.map((item) => {
-            const percent =
-              item.totalBytes > 0
-                ? Math.round((item.downloadedBytes / item.totalBytes) * 100)
-                : 0;
-            const downloadedMB = (item.downloadedBytes / 1024 / 1024).toFixed(1);
-            const totalMB = (item.totalBytes / 1024 / 1024).toFixed(1);
-            const speedMB = (item.speedBytesPerSec / 1024 / 1024).toFixed(1);
+          {downloads.length === 0 ? (
+            <div className="h-60 flex flex-col items-center justify-center p-8 text-center border border-dashed border-slate-800 rounded-2xl">
+              <Inbox className="w-10 h-10 text-slate-600 mb-3" />
+              <h4 className="text-sm font-bold text-slate-300">No Active Downloads</h4>
+              <p className="text-xs text-slate-500 max-w-md mt-1">
+                Enter a direct file URL above to download game patches, extra content, or standalone packages.
+              </p>
+            </div>
+          ) : (
+            downloads.map((item) => {
+              const percent =
+                item.totalBytes > 0
+                  ? Math.round((item.downloadedBytes / item.totalBytes) * 100)
+                  : 0;
+              const downloadedMB = (item.downloadedBytes / 1024 / 1024).toFixed(1);
+              const totalMB = (item.totalBytes / 1024 / 1024).toFixed(1);
+              const speedMB = (item.speedBytesPerSec / 1024 / 1024).toFixed(1);
 
-            return (
-              <div
-                key={item.id}
-                className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <h4 className="text-sm font-bold text-slate-100">{item.title}</h4>
-                    <div className="text-[11px] text-slate-500 font-mono truncate max-w-lg">
-                      {item.sourceUrl}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    {item.status !== 'completed' && (
-                      <button
-                        onClick={() => togglePause(item.id)}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all"
-                      >
-                        {item.status === 'downloading' ? (
-                          <Pause className="w-4 h-4" />
-                        ) : (
-                          <Play className="w-4 h-4" />
-                        )}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => removeDownload(item.id)}
-                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-400 border border-slate-700 transition-all"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-                  <div
-                    className={`h-full transition-all duration-300 ${
-                      item.status === 'completed' ? 'bg-emerald-500' : 'bg-sky-500'
-                    }`}
-                    style={{ width: `${percent}%` }}
-                  />
-                </div>
-
-                {/* Status Footer */}
-                <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
-                  <div className="flex items-center space-x-2">
-                    <span className="capitalize font-semibold text-slate-300">{item.status}</span>
-                    <span>•</span>
-                    <span>
-                      {downloadedMB} MB / {totalMB} MB ({percent}%)
-                    </span>
-                  </div>
-
-                  {item.status === 'downloading' && (
-                    <div className="text-sky-400 font-bold">{speedMB} MB/s</div>
-                  )}
-
-                  {item.status === 'completed' && (
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center text-emerald-400 font-semibold space-x-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Verified</span>
+              return (
+                <div
+                  key={item.id}
+                  className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <h4 className="text-sm font-bold text-slate-100">{item.title}</h4>
+                      <div className="text-[11px] text-slate-500 font-mono truncate max-w-lg">
+                        {item.sourceUrl}
                       </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      {item.status !== 'completed' && (
+                        <button
+                          onClick={() => togglePause(item.id)}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all"
+                        >
+                          {item.status === 'downloading' ? (
+                            <Pause className="w-4 h-4" />
+                          ) : (
+                            <Play className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
                       <button
-                        onClick={() => setConfirmInstallerPath(item.destinationPath)}
-                        className="px-3 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 rounded-lg text-xs font-bold transition-all"
+                        onClick={() => removeDownload(item.id)}
+                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-400 border border-slate-700 transition-all"
                       >
-                        Launch Installer
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        item.status === 'completed' ? 'bg-emerald-500' : 'bg-sky-500'
+                      }`}
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+
+                  {/* Status Footer */}
+                  <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+                    <div className="flex items-center space-x-2">
+                      <span className="capitalize font-semibold text-slate-300">{item.status}</span>
+                      <span>•</span>
+                      <span>
+                        {downloadedMB} MB / {totalMB} MB ({percent}%)
+                      </span>
+                    </div>
+
+                    {item.status === 'downloading' && (
+                      <div className="text-sky-400 font-bold">{speedMB} MB/s</div>
+                    )}
+
+                    {item.status === 'completed' && (
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center text-emerald-400 font-semibold space-x-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Verified</span>
+                        </div>
+                        <button
+                          onClick={() => setConfirmInstallerPath(item.destinationPath)}
+                          className="px-3 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 rounded-lg text-xs font-bold transition-all"
+                        >
+                          Launch Installer
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {/* Execution Feedback Notification */}
@@ -330,4 +329,3 @@ export const DownloadsScreen: React.FC = () => {
     </div>
   );
 };
-
