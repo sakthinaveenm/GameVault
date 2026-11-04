@@ -47,9 +47,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name || 'v0.1.0' }}
-          releaseName: 'Universal Game Hub v0.1.0'
+          releaseName: "Universal Game Hub ${{ github.ref_name }}"
           releaseBody: |
-            # Universal Game Hub v0.1.0
+            # Universal Game Hub ${{ github.ref_name }}
 
             Universal Game Hub is a lightweight, cross-platform desktop gaming launcher inspired by Steam Big Picture Mode and Playnite.
 
