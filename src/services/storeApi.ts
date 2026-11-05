@@ -116,3 +116,4 @@ export async function fetchStoreCatalog(forceRefresh: boolean = false): Promise<
     };
   }
 }
+
