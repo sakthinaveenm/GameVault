@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { DownloadItem, TorrentTask } from '@/types';
 import { api } from '@/services/tauri';
+import { aria2Client } from '@/services/aria2';
 import {
   Download,
   PlusCircle,
@@ -34,8 +35,9 @@ export const DownloadsScreen: React.FC = () => {
   const [isAddTorrentModalOpen, setIsAddTorrentModalOpen] = useState(false);
   const [magnetInput, setMagnetInput] = useState('');
   const [customNameInput, setCustomNameInput] = useState('');
-  const [autoLaunchExternal, setAutoLaunchExternal] = useState(true);
+  const [autoLaunchExternal, setAutoLaunchExternal] = useState(false);
   const [torrentAddError, setTorrentAddError] = useState<string | null>(null);
+  const [isEngineOnline, setIsEngineOnline] = useState<boolean>(true);
 
   // Direct Downloads State
   const [urlInput, setUrlInput] = useState('');
@@ -50,7 +52,7 @@ export const DownloadsScreen: React.FC = () => {
     }).catch(() => {});
   }, []);
 
-  // Initial load of torrents and downloads from SQLite
+  // Initial load of torrents and downloads
   useEffect(() => {
     loadTorrents();
     loadDirectDownloads();
@@ -60,6 +62,8 @@ export const DownloadsScreen: React.FC = () => {
     try {
       const list = await api.listTorrentTasks();
       setTorrents(list);
+      const online = await aria2Client.isOnline();
+      setIsEngineOnline(online);
     } catch (err) {
       console.warn('Failed to load torrents:', err);
     }
@@ -87,55 +91,30 @@ export const DownloadsScreen: React.FC = () => {
     }
   };
 
-  // Periodic progress simulation & real-time sync for active torrents
+  // Real-time synchronization with background in-app download engine
   useEffect(() => {
-    const interval = setInterval(async () => {
-      setTorrents((prevTorrents) => {
-        let changed = false;
-        const next = prevTorrents.map((t) => {
-          if (t.state === 'downloading' && t.progress < 100) {
-            changed = true;
-            const addedBytes = Math.round(t.downloadSpeed * 1.5);
-            const newDownloaded = Math.min(t.totalBytes, t.downloadedBytes + addedBytes);
-            const newProgress = Number(((newDownloaded / t.totalBytes) * 100).toFixed(1));
-            const isFinished = newProgress >= 100;
+    let isMounted = true;
 
-            if (isFinished) {
-              // Persist completion to SQLite
-              api.updateTorrentTaskProgress(
-                t.id,
-                t.totalBytes,
-                t.totalBytes,
-                0,
-                512000,
-                t.seeds + 5,
-                t.peers
-              ).catch(() => {});
+    const syncLiveProgress = async () => {
+      try {
+        const liveTasks = await api.listTorrentTasks();
+        if (isMounted && liveTasks) {
+          setTorrents(liveTasks);
+        }
+        const online = await aria2Client.isOnline();
+        if (isMounted) {
+          setIsEngineOnline(online);
+        }
+      } catch (err) {
+        console.warn('Live engine sync error:', err);
+      }
+    };
 
-              return {
-                ...t,
-                downloadedBytes: t.totalBytes,
-                progress: 100,
-                state: 'completed' as const,
-                downloadSpeed: 0,
-                uploadSpeed: 512000,
-              };
-            }
-
-            return {
-              ...t,
-              downloadedBytes: newDownloaded,
-              progress: newProgress,
-            };
-          }
-          return t;
-        });
-
-        return changed ? next : prevTorrents;
-      });
-    }, 2000);
-
-    return () => clearInterval(interval);
+    const interval = setInterval(syncLiveProgress, 1200);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // Formatter helpers
@@ -296,6 +275,15 @@ export const DownloadsScreen: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-3">
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${
+              isEngineOnline
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isEngineOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <span>{isEngineOnline ? 'In-App Engine: Active' : 'In-App Engine: Standby'}</span>
+            </div>
+
             <button
               onClick={() => setIsAddTorrentModalOpen(true)}
               className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-500/25 active:scale-95"
@@ -391,11 +379,11 @@ export const DownloadsScreen: React.FC = () => {
 
             {/* Torrent Client Helper Notice */}
             <div className="p-4 rounded-2xl bg-sky-950/30 border border-sky-500/30 flex items-start space-x-3 text-xs text-slate-300">
-              <Zap className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+              <Zap className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
-                <span className="font-bold text-white">High-Speed BitTorrent Downloads:</span>
+                <span className="font-bold text-white">Direct In-App BitTorrent Downloads:</span>
                 <p className="text-slate-400">
-                  GameVault tracks tasks, metadata, and folders. To download complete multi-gigabyte installer packages over P2P, click <strong className="text-emerald-400">Launch Client</strong> to transfer files using your system BitTorrent application (qBittorrent, Transmission, etc.).
+                  GameVault downloads repacks, torrents, and magnet links <strong className="text-emerald-400">directly inside this application</strong> to your UniversalGameHub Downloads folder. No external clients (like qBittorrent or Transmission) are required. Once downloaded, click <strong className="text-emerald-400">Run Verified Installer</strong> to install the game immediately.
                 </p>
               </div>
             </div>
@@ -489,19 +477,19 @@ export const DownloadsScreen: React.FC = () => {
 
                           <button
                             onClick={() => handleOpenFolder(task.savePath)}
-                            title="Open Save Folder"
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all"
+                            title="Open Save Folder in File Explorer"
+                            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all shadow-sm"
                           >
-                            <Folder className="w-4 h-4" />
+                            <Folder className="w-4 h-4 text-sky-400" />
+                            <span>Folder</span>
                           </button>
 
                           <button
                             onClick={() => handleOpenExternal(task.magnetUri)}
-                            title="Launch in default BitTorrent client (qBittorrent / Transmission) to transfer files"
-                            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all"
+                            title="Optional: Open in external BitTorrent client"
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 transition-all"
                           >
                             <ExternalLink className="w-4 h-4" />
-                            <span className="hidden sm:inline">Launch Client</span>
                           </button>
 
                           <button
@@ -694,14 +682,19 @@ export const DownloadsScreen: React.FC = () => {
               />
             </div>
 
-            <label className="flex items-center space-x-2.5 text-xs text-slate-300 cursor-pointer pt-1">
+            <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+              <span className="font-semibold text-emerald-400">GameVault In-App Downloader:</span>
+              <p>Files will download directly inside this application and save to your Downloads/UniversalGameHub folder.</p>
+            </div>
+
+            <label className="flex items-center space-x-2.5 text-xs text-slate-400 hover:text-slate-200 cursor-pointer pt-1">
               <input
                 type="checkbox"
                 checked={autoLaunchExternal}
                 onChange={(e) => setAutoLaunchExternal(e.target.checked)}
                 className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-sky-500 focus:ring-sky-500/30"
               />
-              <span>Also launch in default BitTorrent client (e.g. qBittorrent, Transmission)</span>
+              <span>Optional: Also launch in external BitTorrent client (e.g. qBittorrent)</span>
             </label>
 
             <div className="flex items-center justify-end space-x-3 pt-3">
@@ -715,9 +708,9 @@ export const DownloadsScreen: React.FC = () => {
               <button
                 type="submit"
                 disabled={!magnetInput.trim()}
-                className="px-5 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg shadow-sky-600/25 transition-all"
+                className="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/25 transition-all"
               >
-                Start Torrent Download
+                Download In-App
               </button>
             </div>
           </form>

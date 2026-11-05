@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { aria2Client } from './aria2';
 import {
   UserProfile,
   ControllerInfo,
@@ -514,14 +515,17 @@ export const api = {
     filePath: string,
     userConfirmed: boolean
   ): Promise<number> => {
+    if (!userConfirmed) {
+      throw new Error('User confirmation is required to execute installers.');
+    }
     if (isTauriEnvironment()) {
       return await invoke<number>('execute_downloaded_installer', {
         filePath,
         userConfirmed,
       });
     }
-    console.log(`[Browser Sim] Installer execution confirmed: ${userConfirmed}`);
-    return 9999;
+    const success = await aria2Client.runInstaller(filePath);
+    return success ? 1001 : 0;
   },
 
   generateOAuthPkce: async (): Promise<PkceSessionDto> => {
@@ -541,37 +545,88 @@ export const api = {
     savePath?: string,
     totalBytes?: number
   ): Promise<TorrentTask> => {
+    const isOnline = await aria2Client.isOnline();
+    let ariaGid: string | null = null;
+    let ariaPath: string | null = null;
+
+    if (isOnline) {
+      try {
+        const res = await aria2Client.addMagnet(magnetUri, customName, savePath);
+        ariaGid = res.gid;
+        ariaPath = res.savePath;
+      } catch (err) {
+        console.warn('Aria2 addMagnet error, falling back:', err);
+      }
+    }
+
     if (isTauriEnvironment()) {
       const dto = await invoke<TorrentTaskDto>('add_torrent_task', {
         magnetUri,
         customName: customName || null,
-        savePath: savePath || null,
+        savePath: ariaPath || savePath || null,
         totalBytes: totalBytes || null,
       });
-      return mapTorrentTask(dto);
+      const mapped = mapTorrentTask(dto);
+      if (ariaGid) {
+        mapped.id = ariaGid;
+      }
+      return mapped;
     }
+
     const safeName = customName || 'Torrent Download';
+    const finalId = ariaGid || `task-${Date.now()}`;
+    const finalPath = ariaPath || `~/Downloads/UniversalGameHub/Torrents/${safeName}`;
+
     return {
-      id: `sim-torrent-${Date.now()}`,
+      id: finalId,
       infoHash: '5ea0f2bb95a2f71f1f7b433045bcb43d3ef7cd4b',
       name: safeName,
       magnetUri,
-      savePath: `~/Downloads/UniversalGameHub/Torrents/${safeName}`,
+      savePath: finalPath,
       totalBytes: totalBytes || 21474836480,
-      downloadedBytes: 104857600,
-      uploadedBytes: 20971520,
-      downloadSpeed: 15728640,
-      uploadSpeed: 1048576,
-      progress: 0.5,
-      peers: 28,
-      seeds: 64,
-      state: 'downloading',
+      downloadedBytes: 0,
+      uploadedBytes: 0,
+      downloadSpeed: 0,
+      uploadSpeed: 0,
+      progress: 0,
+      peers: 0,
+      seeds: 0,
+      state: 'connecting',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
   },
 
   listTorrentTasks: async (): Promise<TorrentTask[]> => {
+    const isOnline = await aria2Client.isOnline();
+    if (isOnline) {
+      try {
+        const managed = await aria2Client.getAllManagedTasks();
+        if (managed.length > 0) {
+          return managed.map((m) => ({
+            id: m.id,
+            infoHash: m.gid,
+            name: m.name,
+            magnetUri: m.magnetUri,
+            savePath: m.savePath,
+            totalBytes: m.totalBytes,
+            downloadedBytes: m.downloadedBytes,
+            uploadedBytes: m.uploadedBytes,
+            downloadSpeed: m.downloadSpeed,
+            uploadSpeed: m.uploadSpeed,
+            progress: m.progress,
+            peers: m.peers,
+            seeds: m.seeds,
+            state: m.state,
+            createdAt: m.createdAt,
+            updatedAt: m.updatedAt,
+          }));
+        }
+      } catch (err) {
+        console.warn('Error reading from aria2 tasks:', err);
+      }
+    }
+
     if (isTauriEnvironment()) {
       const list = await invoke<TorrentTaskDto[]>('list_torrent_tasks');
       return list.map(mapTorrentTask);
@@ -580,18 +635,27 @@ export const api = {
   },
 
   pauseTorrentTask: async (id: string): Promise<void> => {
+    try {
+      await aria2Client.pause(id);
+    } catch {}
     if (isTauriEnvironment()) {
       await invoke('pause_torrent_task', { id });
     }
   },
 
   resumeTorrentTask: async (id: string): Promise<void> => {
+    try {
+      await aria2Client.unpause(id);
+    } catch {}
     if (isTauriEnvironment()) {
       await invoke('resume_torrent_task', { id });
     }
   },
 
   deleteTorrentTask: async (id: string, deleteFiles: boolean): Promise<void> => {
+    try {
+      await aria2Client.remove(id);
+    } catch {}
     if (isTauriEnvironment()) {
       await invoke('delete_torrent_task', { id, deleteFiles });
     }
@@ -629,7 +693,7 @@ export const api = {
       uploadedBytes: 0,
       downloadSpeed,
       uploadSpeed,
-      progress: (downloadedBytes / totalBytes) * 100,
+      progress: totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0,
       peers,
       seeds,
       state: downloadedBytes >= totalBytes ? 'completed' : 'downloading',
@@ -671,6 +735,7 @@ export const api = {
   },
 
   openTorrentFolder: async (path: string): Promise<void> => {
+    await aria2Client.openFolder(path);
     if (isTauriEnvironment()) {
       await invoke('open_torrent_folder', { path });
     }

@@ -72,7 +72,7 @@ export const StoreScreen: React.FC = () => {
     setIsRefreshing(false);
   };
 
-  const handleQuickDownloadMagnet = async (game: StoreGame, launchExternal: boolean = true) => {
+  const handleQuickDownloadMagnet = async (game: StoreGame, launchExternal: boolean = false) => {
     if (!game.magnetUrl || game.magnetUrl.length === 0) {
       setSelectedGame(game);
       return;
@@ -86,13 +86,13 @@ export const StoreScreen: React.FC = () => {
       await api.addTorrentTask(magnetUri, game.name, undefined, estimatedBytes);
       if (launchExternal) {
         await api.openInExternalTorrentClient(magnetUri);
-        setToastNotification(`Queued & launched "${game.name}" in BitTorrent client!`);
+        setToastNotification(`Started download & opened external client for "${game.name}".`);
       } else {
-        setToastNotification(`Queued torrent download for "${game.name}"!`);
+        setToastNotification(`Started in-app download for "${game.name}"! Tracking progress in Downloads tab.`);
       }
       setTimeout(() => setToastNotification(null), 6000);
     } catch (err: any) {
-      alert(`Could not queue torrent download: ${err?.message || err}`);
+      alert(`Could not start in-app download: ${err?.message || err}`);
     }
   };
 

@@ -416,21 +416,21 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
                         <button
                           type="button"
                           onClick={() => handleDownloadSpecificTorrent(mirror.magnetUrl, mirror.title)}
-                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
-                          title="Queue Torrent in GameVault Download Manager"
+                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+                          title="Download inside GameVault"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          <span>Queue</span>
+                          <span>Download In-App</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => api.openInExternalTorrentClient(mirror.magnetUrl)}
-                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all border border-emerald-500/40 shadow-sm active:scale-95"
-                          title="Open directly in system BitTorrent client (e.g. qBittorrent, Transmission)"
+                          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-all border border-slate-700 shadow-sm active:scale-95"
+                          title="Open in external BitTorrent client (optional)"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Launch Client</span>
+                          <span className="hidden sm:inline">External</span>
                         </button>
                       </div>
                     </div>
@@ -445,7 +445,7 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
         <div className="px-6 py-4 bg-slate-950/90 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4 shrink-0">
           <div className="flex items-center space-x-2 text-xs text-slate-400">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>DRM-Free Compatible Catalog Entry</span>
+            <span>DRM-Free Compatible Catalog Entry &bull; In-App Engine Active</span>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -486,13 +486,13 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
             {game.magnetUrl && game.magnetUrl.length > 0 ? (
               <button
                 type="button"
-                onClick={() => handleQueueDownload(true)}
+                onClick={() => handleQueueDownload(false)}
                 disabled={isDownloading}
                 className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-black tracking-wider uppercase transition-all shadow-lg shadow-emerald-500/25 active:scale-95 flex items-center space-x-2"
-                title="Queue download in GameVault and launch directly in your default BitTorrent client (qBittorrent / Transmission)"
+                title="Download directly inside GameVault without external software"
               >
                 <Download className="w-4 h-4" />
-                <span>{isDownloading ? 'Launching...' : 'Download & Launch'}</span>
+                <span>{isDownloading ? 'Starting Download...' : 'Download In-App'}</span>
               </button>
             ) : (
               <button
@@ -501,7 +501,7 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
                 className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-black tracking-wider uppercase transition-all shadow-lg shadow-sky-500/25 active:scale-95 flex items-center space-x-2"
               >
                 <Download className="w-4 h-4" />
-                <span>{isDownloading ? 'Queuing...' : 'Download / Install'}</span>
+                <span>{isDownloading ? 'Queuing...' : 'Download In-App'}</span>
               </button>
             )}
           </div>
