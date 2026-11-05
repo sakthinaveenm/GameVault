@@ -255,14 +255,21 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
             <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-800">
               <div className="flex items-center space-x-2 text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
                 <Layers className="w-4 h-4" />
-                <span>Studio & Version</span>
+                <span>Studio & Publisher</span>
               </div>
               <p className="text-sm font-bold text-white truncate">
                 {game.metadata.developer || 'Independent'}
+                {game.metadata.publisher ? ` • ${game.metadata.publisher}` : ''}
               </p>
-              <p className="text-xs text-slate-400 truncate mt-1">
-                {game.metadata.gameVersion || 'Latest Release'}
-              </p>
+              <div className="flex items-center justify-between text-xs text-slate-400 truncate mt-1">
+                <span>{game.metadata.gameVersion || 'Latest Release'}</span>
+                {game.publishedAt && (
+                  <span className="flex items-center space-x-1 text-[11px] text-slate-400">
+                    <Calendar className="w-3 h-3 text-sky-400" />
+                    <span>{new Date(game.publishedAt).toLocaleDateString()}</span>
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Languages Card */}

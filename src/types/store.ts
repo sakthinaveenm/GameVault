@@ -3,7 +3,7 @@ export interface StoreGameMetadata {
   publisher?: string | null;
   genres?: string;
   languages?: string;
-  gameVersion?: string;
+  gameVersion?: string | null;
   originalSize?: string;
   repackSize?: string;
   downloadSize?: string;
@@ -30,9 +30,8 @@ export interface StoreGame {
   publishedAt?: string;
   metadata: StoreGameMetadata;
   specifications?: StoreGameSpecifications;
-  paragraphs?: string[];
   magnetUrl?: StoreGameMagnet[];
-  magneturl?: string | StoreGameMagnet[];
+  paragraphs?: string[];
 }
 
 export interface StoreApiResponse {
@@ -46,4 +45,3 @@ export interface StoreApiResponse {
   complete?: boolean;
   games: StoreGame[];
 }
-
