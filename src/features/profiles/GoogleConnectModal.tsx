@@ -85,7 +85,7 @@ export const GoogleConnectModal: React.FC<GoogleConnectModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 select-none animate-fade-in">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-3xl p-6 shadow-2xl space-y-5">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto min-h-0 bg-slate-900 border border-slate-700/80 rounded-3xl p-6 shadow-2xl space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center space-x-3">

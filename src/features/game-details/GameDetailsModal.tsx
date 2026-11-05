@@ -121,7 +121,7 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        <div className="flex-1 overflow-y-auto min-h-0 p-8 space-y-6">
           {/* Summary */}
           {game.summary && (
             <div className="space-y-1.5">

@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   UserProfile,
   ControllerInfo,
@@ -638,10 +639,34 @@ export const api = {
   },
 
   openInExternalTorrentClient: async (magnetUri: string): Promise<void> => {
+    const trimmed = magnetUri.trim();
+    if (!trimmed) return;
+
     if (isTauriEnvironment()) {
-      await invoke('open_in_external_torrent_client', { magnetUri });
-    } else {
-      window.open(magnetUri, '_blank');
+      try {
+        await openUrl(trimmed);
+        return;
+      } catch (err) {
+        console.warn('plugin-opener openUrl failed, attempting direct command invoke:', err);
+      }
+      try {
+        await invoke('open_in_external_torrent_client', { magnetUri: trimmed });
+        return;
+      } catch (err) {
+        console.warn('invoke open_in_external_torrent_client failed:', err);
+      }
+    }
+
+    // Browser / WebView standard protocol handler dispatch
+    try {
+      const link = document.createElement('a');
+      link.href = trimmed;
+      link.rel = 'noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      window.location.href = trimmed;
     }
   },
 

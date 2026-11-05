@@ -60,7 +60,7 @@ export const ControllerSettingsScreen: React.FC = () => {
   const isBtnActive = (idx: number) => activeButtons.includes(idx);
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 select-none">
       {/* Top Header */}
       <div className="px-8 pt-6 pb-4 bg-[#0b0e14] border-b border-slate-800/80">
         <div className="flex items-center justify-between">
@@ -88,7 +88,7 @@ export const ControllerSettingsScreen: React.FC = () => {
       </div>
 
       {/* Main Body */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6 max-w-5xl">
+      <div className="flex-1 overflow-y-auto min-h-0 px-8 py-6 space-y-6 max-w-5xl">
         {/* Detected Devices List */}
         <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4">
           <h3 className="font-bold text-slate-100 text-sm flex items-center">

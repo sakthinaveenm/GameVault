@@ -75,7 +75,7 @@ export const ProfilesScreen: React.FC = () => {
   const totalPlaytimeHours = games.reduce((acc, g) => acc + (g.playtimeMinutes || 0), 0) / 60;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden select-none bg-[#090d14] text-slate-100">
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 select-none bg-[#090d14] text-slate-100">
       {/* Top Header & Sub-Tabs */}
       <div className="px-8 pt-6 pb-4 bg-[#0b0f18] border-b border-slate-800/80 shrink-0">
         <div className="flex items-center justify-between mb-4">
@@ -148,7 +148,7 @@ export const ProfilesScreen: React.FC = () => {
       </div>
 
       {/* Main Content Pane */}
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+      <div className="flex-1 overflow-y-auto min-h-0 p-8 space-y-6">
         {/* TAB 1: Profile Overview Dashboard */}
         {activeTab === 'dashboard' && activeProfile && (
           <div className="max-w-5xl space-y-6 animate-fade-in">

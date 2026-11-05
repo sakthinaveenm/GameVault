@@ -34,7 +34,7 @@ export const ProfileSelectionScreen: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-screen bg-[#07090e] text-slate-100 flex flex-col justify-between p-8 sm:p-12 select-none overflow-hidden font-sans">
+    <div className="relative min-h-screen w-screen bg-[#07090e] text-slate-100 flex flex-col justify-between p-8 sm:p-12 select-none overflow-y-auto font-sans">
       {/* Background Ambience */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[450px] bg-gradient-to-r from-sky-600/10 via-indigo-600/10 to-purple-600/10 rounded-full blur-[140px] pointer-events-none" />
 

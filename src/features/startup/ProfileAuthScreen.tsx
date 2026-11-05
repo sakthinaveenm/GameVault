@@ -95,7 +95,7 @@ export const ProfileAuthScreen: React.FC = () => {
   return (
     <div
       onKeyDown={handleKeyDown}
-      className="relative min-h-screen w-screen bg-[#07090e] text-slate-100 flex flex-col justify-between p-8 sm:p-12 select-none overflow-hidden font-sans"
+      className="relative min-h-screen w-screen bg-[#07090e] text-slate-100 flex flex-col justify-between p-8 sm:p-12 select-none overflow-y-auto font-sans"
     >
       {/* Background Ambience */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-amber-500/10 rounded-full blur-[140px] pointer-events-none" />

@@ -39,6 +39,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGame }) => {
     }
   };
 
+  const handleHorizontalWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.deltaY !== 0) {
+      e.currentTarget.scrollLeft += e.deltaY;
+    }
+  };
+
   const recentGames = React.useMemo(() => {
     return [...games]
       .filter((g) => g.lastPlayedAt || g.playtimeMinutes)
@@ -56,7 +62,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGame }) => {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8 select-none bg-gradient-to-b from-[#0e1624] via-[#0b0f17] to-[#080c12]">
+    <div className="flex-1 overflow-y-auto min-h-0 px-8 py-6 space-y-8 select-none bg-gradient-to-b from-[#0e1624] via-[#0b0f17] to-[#080c12]">
       {/* Hero Showcase (Steam Big Picture Spotlight) */}
       {heroGame ? (
         <div className="relative w-full h-96 rounded-3xl bg-[#090d15] border border-slate-700/60 overflow-hidden shadow-2xl flex items-end p-8 md:p-10 group">
@@ -204,6 +210,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGame }) => {
 
           <div
             ref={recentShelfRef}
+            onWheel={handleHorizontalWheel}
             className="flex items-center space-x-5 overflow-x-auto no-scrollbar py-3 px-1 scroll-smooth"
           >
             {recentGames.map((game) => (
@@ -256,6 +263,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGame }) => {
 
           <div
             ref={allShelfRef}
+            onWheel={handleHorizontalWheel}
             className="flex items-center space-x-5 overflow-x-auto no-scrollbar py-3 px-1 scroll-smooth"
           >
             {games.map((game) => (
@@ -302,6 +310,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGame }) => {
 
           <div
             ref={favShelfRef}
+            onWheel={handleHorizontalWheel}
             className="flex items-center space-x-5 overflow-x-auto no-scrollbar py-3 px-1 scroll-smooth"
           >
             {favoriteGames.map((game) => (

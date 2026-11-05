@@ -99,13 +99,17 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
     return 21474836480;
   };
 
-  const handleQueueDownload = async () => {
+  const handleQueueDownload = async (launchExternal: boolean = false) => {
     setIsDownloading(true);
     const estimatedBytes = parseRepackBytes(game.metadata.repackSize);
 
     try {
       if (game.magnetUrl && game.magnetUrl.length > 0) {
-        await api.addTorrentTask(game.magnetUrl[0].magnetUrl, game.name, undefined, estimatedBytes);
+        const primaryMagnet = game.magnetUrl[0].magnetUrl;
+        await api.addTorrentTask(primaryMagnet, game.name, undefined, estimatedBytes);
+        if (launchExternal) {
+          await api.openInExternalTorrentClient(primaryMagnet);
+        }
       } else {
         await api.queueDownload(game.name, game.pageUrl || 'https://fitgirl-repacks.site', `~/Downloads/${game.name}`);
       }
@@ -181,7 +185,7 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
         </div>
 
         {/* Scrollable Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6">
           {/* Main Screenshot Carousel */}
           <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden bg-black/60 border border-slate-800 shadow-xl group">
             <img
@@ -363,10 +367,15 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
           {/* Magnet / Torrent Links */}
           {game.magnetUrl && game.magnetUrl.length > 0 && (
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
-              <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center space-x-2">
-                <Link2 className="w-4 h-4 text-emerald-400" />
-                <span>P2P Repack Mirrors ({game.magnetUrl.length})</span>
-              </h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center space-x-2">
+                  <Link2 className="w-4 h-4 text-emerald-400" />
+                  <span>P2P Repack Mirrors ({game.magnetUrl.length})</span>
+                </h3>
+                <span className="text-[11px] text-slate-400">
+                  Click <strong className="text-sky-400">Download Torrent</strong> to track in GameVault, or <strong className="text-emerald-400">Launch Client</strong> for live BitTorrent transfer
+                </span>
+              </div>
               <div className="space-y-2">
                 {game.magnetUrl.map((mirror, idx) => {
                   const isCopied = copiedMagnetIndex === idx;
@@ -407,20 +416,21 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
                         <button
                           type="button"
                           onClick={() => handleDownloadSpecificTorrent(mirror.magnetUrl, mirror.title)}
-                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
-                          title="Queue Torrent in Download Manager"
+                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+                          title="Queue Torrent in GameVault Download Manager"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          <span>Download Torrent</span>
+                          <span>Queue</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => api.openInExternalTorrentClient(mirror.magnetUrl)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all border border-slate-700"
-                          title="Open in System Torrent Client"
+                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all border border-emerald-500/40 shadow-sm active:scale-95"
+                          title="Open directly in system BitTorrent client (e.g. qBittorrent, Transmission)"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Launch Client</span>
                         </button>
                       </div>
                     </div>
@@ -473,14 +483,27 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
               )}
             </button>
 
-            <button
-              onClick={handleQueueDownload}
-              disabled={isDownloading}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-black tracking-wider uppercase transition-all shadow-lg shadow-sky-500/25 active:scale-95 flex items-center space-x-2"
-            >
-              <Download className="w-4 h-4" />
-              <span>{isDownloading ? 'Queuing...' : 'Download / Install'}</span>
-            </button>
+            {game.magnetUrl && game.magnetUrl.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => handleQueueDownload(true)}
+                disabled={isDownloading}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-black tracking-wider uppercase transition-all shadow-lg shadow-emerald-500/25 active:scale-95 flex items-center space-x-2"
+                title="Queue download in GameVault and launch directly in your default BitTorrent client (qBittorrent / Transmission)"
+              >
+                <Download className="w-4 h-4" />
+                <span>{isDownloading ? 'Launching...' : 'Download & Launch'}</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => handleQueueDownload(false)}
+                disabled={isDownloading}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-black tracking-wider uppercase transition-all shadow-lg shadow-sky-500/25 active:scale-95 flex items-center space-x-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>{isDownloading ? 'Queuing...' : 'Download / Install'}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

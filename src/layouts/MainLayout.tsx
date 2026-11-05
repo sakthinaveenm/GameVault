@@ -113,7 +113,7 @@ export const MainLayout: React.FC = () => {
         <Topbar />
 
         {/* Dynamic Screen View */}
-        <main className="flex-1 overflow-hidden flex flex-col relative">
+        <main className="flex-1 overflow-hidden flex flex-col relative min-h-0">
           {renderActiveScreen()}
         </main>
 

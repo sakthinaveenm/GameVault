@@ -99,7 +99,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
   }, [games, sourceFilter, onlyInstalled, onlyFavorites, searchQuery, sortBy]);
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden select-none bg-gradient-to-b from-[#0e1624] via-[#0b0f17] to-[#080c12]">
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 select-none bg-gradient-to-b from-[#0e1624] via-[#0b0f17] to-[#080c12]">
       {/* Top Filter Bar */}
       <div className="px-8 pt-6 pb-4 bg-[#090d15]/95 border-b border-slate-800/80 space-y-4 shrink-0">
         <div className="flex items-center justify-between">
@@ -153,7 +153,10 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
           </div>
 
           {/* Source Tabs */}
-          <div className="flex items-center p-1 bg-slate-950/80 rounded-xl border border-slate-800/80 overflow-x-auto no-scrollbar">
+          <div
+            onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }}
+            className="flex items-center p-1 bg-slate-950/80 rounded-xl border border-slate-800/80 overflow-x-auto no-scrollbar"
+          >
             {SOURCES.map((s) => (
               <button
                 key={s.id}
@@ -229,7 +232,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({
       </div>
 
       {/* Game Cards Grid View */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
+      <div className="flex-1 overflow-y-auto min-h-0 px-8 py-6">
         {filteredGames.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
             {filteredGames.map((game) => (

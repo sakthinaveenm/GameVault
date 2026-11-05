@@ -51,7 +51,7 @@ export const RetroScreen: React.FC<RetroScreenProps> = ({ onSelectGame }) => {
   }, [games, selectedSystem]);
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 select-none">
       {/* Header */}
       <div className="px-8 pt-6 pb-4 bg-[#0b0e14] border-b border-slate-800/80 space-y-4">
         <div className="flex items-center justify-between">
@@ -105,7 +105,7 @@ export const RetroScreen: React.FC<RetroScreenProps> = ({ onSelectGame }) => {
       </div>
 
       {/* Grid */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
+      <div className="flex-1 overflow-y-auto min-h-0 px-8 py-6">
         {retroGames.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
             {retroGames.map((game) => (

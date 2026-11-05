@@ -34,6 +34,7 @@ export const DownloadsScreen: React.FC = () => {
   const [isAddTorrentModalOpen, setIsAddTorrentModalOpen] = useState(false);
   const [magnetInput, setMagnetInput] = useState('');
   const [customNameInput, setCustomNameInput] = useState('');
+  const [autoLaunchExternal, setAutoLaunchExternal] = useState(true);
   const [torrentAddError, setTorrentAddError] = useState<string | null>(null);
 
   // Direct Downloads State
@@ -170,12 +171,20 @@ export const DownloadsScreen: React.FC = () => {
     if (!magnetInput.trim()) return;
 
     setTorrentAddError(null);
+    const trimmedMagnet = magnetInput.trim();
     try {
       const task = await api.addTorrentTask(
-        magnetInput.trim(),
+        trimmedMagnet,
         customNameInput.trim() || undefined
       );
       setTorrents((prev) => [task, ...prev]);
+
+      if (autoLaunchExternal) {
+        api.openInExternalTorrentClient(trimmedMagnet).catch((err) => {
+          console.warn('Could not launch external torrent client:', err);
+        });
+      }
+
       setMagnetInput('');
       setCustomNameInput('');
       setIsAddTorrentModalOpen(false);
@@ -268,7 +277,7 @@ export const DownloadsScreen: React.FC = () => {
   const totalDownloadedBytes = torrents.reduce((acc, t) => acc + t.downloadedBytes, 0);
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden select-none bg-[#090d14] text-slate-100">
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 select-none bg-[#090d14] text-slate-100">
       {/* Top Header */}
       <div className="px-8 pt-6 pb-4 bg-[#0b0f18] border-b border-slate-800/80 shrink-0">
         <div className="flex items-center justify-between mb-4">
@@ -338,7 +347,7 @@ export const DownloadsScreen: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+      <div className="flex-1 overflow-y-auto min-h-0 px-8 py-6 space-y-6">
         {activeTab === 'torrents' ? (
           <div className="space-y-6 max-w-5xl">
             {/* Live Stats Overview Banner */}
@@ -377,6 +386,17 @@ export const DownloadsScreen: React.FC = () => {
                 </div>
                 <div className="text-2xl font-black text-white">{formatBytes(totalDownloadedBytes)}</div>
                 <p className="text-[11px] text-slate-500">Completed repack bytes</p>
+              </div>
+            </div>
+
+            {/* Torrent Client Helper Notice */}
+            <div className="p-4 rounded-2xl bg-sky-950/30 border border-sky-500/30 flex items-start space-x-3 text-xs text-slate-300">
+              <Zap className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <span className="font-bold text-white">High-Speed BitTorrent Downloads:</span>
+                <p className="text-slate-400">
+                  GameVault tracks tasks, metadata, and folders. To download complete multi-gigabyte installer packages over P2P, click <strong className="text-emerald-400">Launch Client</strong> to transfer files using your system BitTorrent application (qBittorrent, Transmission, etc.).
+                </p>
               </div>
             </div>
 
@@ -477,10 +497,11 @@ export const DownloadsScreen: React.FC = () => {
 
                           <button
                             onClick={() => handleOpenExternal(task.magnetUri)}
-                            title="Open in System Torrent Client (qBittorrent / Transmission)"
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all"
+                            title="Launch in default BitTorrent client (qBittorrent / Transmission) to transfer files"
+                            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all"
                           >
                             <ExternalLink className="w-4 h-4" />
+                            <span className="hidden sm:inline">Launch Client</span>
                           </button>
 
                           <button
@@ -672,6 +693,16 @@ export const DownloadsScreen: React.FC = () => {
                 className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500"
               />
             </div>
+
+            <label className="flex items-center space-x-2.5 text-xs text-slate-300 cursor-pointer pt-1">
+              <input
+                type="checkbox"
+                checked={autoLaunchExternal}
+                onChange={(e) => setAutoLaunchExternal(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-sky-500 focus:ring-sky-500/30"
+              />
+              <span>Also launch in default BitTorrent client (e.g. qBittorrent, Transmission)</span>
+            </label>
 
             <div className="flex items-center justify-end space-x-3 pt-3">
               <button

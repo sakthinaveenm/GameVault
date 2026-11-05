@@ -135,7 +135,7 @@ export const EmulatorsScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 select-none">
       <input
         type="file"
         ref={fileInputRef}
@@ -159,7 +159,7 @@ export const EmulatorsScreen: React.FC = () => {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
+      <div className="flex-1 overflow-y-auto min-h-0 px-8 py-6 space-y-4">
         {emulators.map((emu) => {
           const isEditing = editingId === emu.id;
 

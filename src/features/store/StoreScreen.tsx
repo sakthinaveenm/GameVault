@@ -72,7 +72,7 @@ export const StoreScreen: React.FC = () => {
     setIsRefreshing(false);
   };
 
-  const handleQuickDownloadMagnet = async (game: StoreGame) => {
+  const handleQuickDownloadMagnet = async (game: StoreGame, launchExternal: boolean = true) => {
     if (!game.magnetUrl || game.magnetUrl.length === 0) {
       setSelectedGame(game);
       return;
@@ -82,11 +82,23 @@ export const StoreScreen: React.FC = () => {
     const estimatedBytes = match ? Math.round(parseFloat(match[1]) * 1024 * 1024 * 1024) : 21474836480;
 
     try {
-      await api.addTorrentTask(game.magnetUrl[0].magnetUrl, game.name, undefined, estimatedBytes);
-      setToastNotification(`Queued torrent download for "${game.name}"!`);
+      const magnetUri = game.magnetUrl[0].magnetUrl;
+      await api.addTorrentTask(magnetUri, game.name, undefined, estimatedBytes);
+      if (launchExternal) {
+        await api.openInExternalTorrentClient(magnetUri);
+        setToastNotification(`Queued & launched "${game.name}" in BitTorrent client!`);
+      } else {
+        setToastNotification(`Queued torrent download for "${game.name}"!`);
+      }
       setTimeout(() => setToastNotification(null), 6000);
     } catch (err: any) {
       alert(`Could not queue torrent download: ${err?.message || err}`);
+    }
+  };
+
+  const handleHorizontalWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.deltaY !== 0) {
+      e.currentTarget.scrollLeft += e.deltaY;
     }
   };
 
@@ -160,7 +172,7 @@ export const StoreScreen: React.FC = () => {
   const heroGame = games[0] || null;
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8 select-none bg-gradient-to-b from-[#0e1624] via-[#0b0f17] to-[#080c12] relative">
+    <div className="flex-1 overflow-y-auto min-h-0 px-8 py-6 space-y-8 select-none bg-gradient-to-b from-[#0e1624] via-[#0b0f17] to-[#080c12] relative">
       {/* Top Catalog Status & Live Indicator */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/80">
         <div className="flex items-center space-x-3">
@@ -309,6 +321,7 @@ export const StoreScreen: React.FC = () => {
 
           <div
             ref={shelfRef}
+            onWheel={handleHorizontalWheel}
             className="flex space-x-5 overflow-x-auto no-scrollbar scroll-smooth py-2"
           >
             {games.slice(0, 8).map((game) => (
@@ -444,7 +457,10 @@ export const StoreScreen: React.FC = () => {
           </div>
 
           {/* Genre Pill Filter Buttons */}
-          <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
+          <div
+            onWheel={handleHorizontalWheel}
+            className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1"
+          >
             <button
               onClick={() => setSelectedGenre('all')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${

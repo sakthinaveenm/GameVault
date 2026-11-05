@@ -40,7 +40,7 @@ export const BatoceraScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 select-none">
       {/* Top Header */}
       <div className="px-8 pt-6 pb-4 bg-[#0b0e14] border-b border-slate-800/80">
         <div className="flex items-center space-x-3">
@@ -57,7 +57,7 @@ export const BatoceraScreen: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6 max-w-4xl">
+      <div className="flex-1 overflow-y-auto min-h-0 px-8 py-6 space-y-6 max-w-4xl">
         {/* Connection Configuration Card */}
         <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-5">
           <div className="flex items-center justify-between">

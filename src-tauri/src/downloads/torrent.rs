@@ -368,8 +368,10 @@ impl TorrentManager {
 
         #[cfg(target_os = "windows")]
         {
-            Command::new("cmd")
-                .args(["/C", "start", "", trimmed])
+            // Use rundll32 url.dll,FileProtocolHandler to avoid cmd.exe shell interpretation
+            // where '&' characters in the magnet query string cause cmd to split arguments and fail.
+            Command::new("rundll32")
+                .args(["url.dll,FileProtocolHandler", trimmed])
                 .spawn()
                 .map_err(AppError::Io)?;
         }

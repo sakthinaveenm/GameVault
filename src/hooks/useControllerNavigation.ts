@@ -114,7 +114,7 @@ export function useControllerNavigation() {
                   nextIndex = (currentIndex - 1 + focusableElements.length) % focusableElements.length;
                 }
               }
-              focusableElements[nextIndex].focus();
+              focusableElements[nextIndex].focus({ preventScroll: true });
               lastInputTime.current = now;
             }
           }

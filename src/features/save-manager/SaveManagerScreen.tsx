@@ -121,7 +121,7 @@ export const SaveManagerScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 select-none">
       {/* Top Header */}
       <div className="px-8 pt-6 pb-4 bg-[#0b0e14] border-b border-slate-800/80">
         <div className="flex items-center justify-between">
@@ -166,13 +166,13 @@ export const SaveManagerScreen: React.FC = () => {
       )}
 
       {/* Two Column Layout: Game Selector + Version Snapshots */}
-      <div className="flex-1 flex overflow-hidden px-8 py-6 space-x-6">
+      <div className="flex-1 flex overflow-hidden min-h-0 px-8 py-6 space-x-6">
         {/* Left: Game List Selector */}
-        <div className="w-72 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shrink-0">
+        <div className="w-72 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden min-h-0 shrink-0">
           <div className="p-3 border-b border-slate-800 text-xs font-bold text-slate-400 uppercase tracking-wider">
             Configured Games ({games.length})
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-1">
             {games.length > 0 ? (
               games.map((g) => (
                 <button
@@ -199,7 +199,7 @@ export const SaveManagerScreen: React.FC = () => {
         </div>
 
         {/* Right: Snapshot History & File Management */}
-        <div className="flex-1 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden p-6 space-y-5">
+        <div className="flex-1 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden min-h-0 p-6 space-y-5">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div className="flex-1 max-w-xl">
               <h2 className="text-lg font-bold text-slate-100">{selectedGame.title}</h2>
@@ -217,7 +217,7 @@ export const SaveManagerScreen: React.FC = () => {
           </div>
 
           {/* Snapshots Timeline */}
-          <div className="flex-1 overflow-y-auto space-y-3">
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 Version Snapshots History ({snapshots.length})

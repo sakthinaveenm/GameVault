@@ -51,7 +51,7 @@ export const StatisticsScreen: React.FC = () => {
   }, {});
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 select-none">
       {/* Top Header */}
       <div className="px-8 pt-6 pb-4 bg-[#0b0e14] border-b border-slate-800/80">
         <div className="flex items-center space-x-3">
@@ -68,7 +68,7 @@ export const StatisticsScreen: React.FC = () => {
       </div>
 
       {/* Main Body */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6 max-w-5xl">
+      <div className="flex-1 overflow-y-auto min-h-0 px-8 py-6 space-y-6 max-w-5xl">
         {/* KPI Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 flex items-center space-x-4">
