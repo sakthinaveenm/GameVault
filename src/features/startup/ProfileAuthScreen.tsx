@@ -252,3 +252,4 @@ export const ProfileAuthScreen: React.FC = () => {
     </div>
   );
 };
+

@@ -27,3 +27,4 @@ CREATE TABLE IF NOT EXISTS profile_cloud_links (
 
 CREATE INDEX IF NOT EXISTS idx_profile_cloud_links_profile ON profile_cloud_links(profile_id);
 CREATE INDEX IF NOT EXISTS idx_profile_cloud_links_sync_id ON profile_cloud_links(sync_profile_id);
+
