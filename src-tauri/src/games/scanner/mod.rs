@@ -98,26 +98,35 @@ impl GameScanner {
     }
 
     fn derive_title(path: &Path) -> String {
-        if let Some(parent) = path.parent() {
-            let p_name = parent.file_name().unwrap_or_default().to_string_lossy().to_string();
-            let p_lower = p_name.to_lowercase();
-            if p_lower == "retail" || p_lower == "binaries" || p_lower == "win64" || p_lower == "bin" || p_lower == "x64" {
-                if let Some(gp) = parent.parent() {
-                    let gp_name = gp.file_name().unwrap_or_default().to_string_lossy().to_string();
-                    if !gp_name.is_empty() && gp_name != "Games" && gp_name != "common" {
-                        return gp_name;
-                    }
-                }
-            } else if !p_name.is_empty() && p_name != "Games" && p_name != "common" && !p_lower.contains("steam") {
-                return p_name;
-            }
-        }
-
         let stem = path
             .file_stem()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
+
+        let stem_lower = stem.to_lowercase();
+        let is_generic_binary = stem_lower == "game"
+            || stem_lower == "launcher"
+            || stem_lower == "start"
+            || stem_lower.ends_with("-win64-shipping")
+            || stem_lower.ends_with("shipping");
+
+        if is_generic_binary {
+            if let Some(parent) = path.parent() {
+                let p_name = parent.file_name().unwrap_or_default().to_string_lossy().to_string();
+                let p_lower = p_name.to_lowercase();
+                if p_lower == "retail" || p_lower == "binaries" || p_lower == "win64" || p_lower == "bin" || p_lower == "x64" {
+                    if let Some(gp) = parent.parent() {
+                        let gp_name = gp.file_name().unwrap_or_default().to_string_lossy().to_string();
+                        if !gp_name.is_empty() && gp_name != "Games" && gp_name != "common" {
+                            return gp_name;
+                        }
+                    }
+                } else if !p_name.is_empty() && p_name != "Games" && p_name != "common" && !p_lower.contains("steam") {
+                    return p_name;
+                }
+            }
+        }
 
         stem.replace('_', " ").replace('-', " ")
     }
