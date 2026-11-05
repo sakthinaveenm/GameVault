@@ -49,6 +49,14 @@ pub struct Game {
     pub last_played_at: Option<DateTime<Utc>>,
 }
 
+fn default_auth_type() -> String {
+    "none".into()
+}
+
+fn default_theme() -> String {
+    "dark".into()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserProfile {
@@ -59,10 +67,86 @@ pub struct UserProfile {
     pub avatar_path: Option<String>,
     #[serde(alias = "is_default", default)]
     pub is_default: bool,
+    #[serde(alias = "authentication_enabled", default)]
+    pub authentication_enabled: bool,
+    #[serde(alias = "auth_type", default = "default_auth_type")]
+    pub auth_type: String, // "none", "pin", "password"
+    #[serde(alias = "theme_preference", default = "default_theme")]
+    pub theme_preference: String,
+    #[serde(alias = "preferred_controller")]
+    pub preferred_controller: Option<String>,
+    #[serde(alias = "sync_profile_id")]
+    pub sync_profile_id: Option<String>,
+    #[serde(alias = "linked_google_email")]
+    pub linked_google_email: Option<String>,
+    #[serde(alias = "last_played_game")]
+    pub last_played_game: Option<String>,
+    #[serde(alias = "last_played_at")]
+    pub last_played_at: Option<DateTime<Utc>>,
     #[serde(alias = "created_at", default = "Utc::now")]
     pub created_at: DateTime<Utc>,
     #[serde(alias = "updated_at", default = "Utc::now")]
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateProfileInput {
+    pub display_name: String,
+    pub avatar_path: Option<String>,
+    #[serde(default = "default_auth_type")]
+    pub auth_type: String,
+    pub pin: Option<String>,
+    pub password: Option<String>,
+    pub theme_preference: Option<String>,
+    pub preferred_controller: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProfileInput {
+    pub id: String,
+    pub display_name: Option<String>,
+    pub avatar_path: Option<String>,
+    pub auth_type: Option<String>,
+    pub new_pin: Option<String>,
+    pub new_password: Option<String>,
+    pub remove_auth: Option<bool>,
+    pub theme_preference: Option<String>,
+    pub preferred_controller: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthVerificationResult {
+    pub success: bool,
+    pub remaining_attempts: u32,
+    pub locked_out: bool,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartupDiagnostics {
+    pub config_ready: bool,
+    pub database_ready: bool,
+    pub profiles_count: usize,
+    pub default_profile_id: Option<String>,
+    pub connected_controllers_count: usize,
+    pub app_version: String,
+    pub app_data_dir: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudProfileSummary {
+    pub sync_profile_id: String,
+    pub display_name: String,
+    pub avatar_path: Option<String>,
+    pub last_synced_at: String,
+    pub game_count: usize,
+    pub backup_size_bytes: u64,
+    pub device_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,6 +248,14 @@ mod tests {
             display_name: "RetroHero".into(),
             avatar_path: None,
             is_default: true,
+            authentication_enabled: false,
+            auth_type: "none".into(),
+            theme_preference: "dark".into(),
+            preferred_controller: None,
+            sync_profile_id: Some("sync-1".into()),
+            linked_google_email: None,
+            last_played_game: None,
+            last_played_at: None,
             created_at: now,
             updated_at: now,
         };

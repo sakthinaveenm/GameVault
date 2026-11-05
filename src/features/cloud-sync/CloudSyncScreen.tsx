@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export const CloudSyncScreen: React.FC = () => {
-  const { activeProfile, updateProfile } = useProfileStore();
+  const { activeProfile, linkGoogleAccount, unlinkGoogleAccount } = useProfileStore();
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [driveMode, setDriveMode] = useState<'appdata' | 'folder'>('appdata');
@@ -51,18 +51,14 @@ export const CloudSyncScreen: React.FC = () => {
       console.warn('OAuth PKCE generation fallback:', err);
     }
 
-    updateProfile(activeProfile.id, {
-      linkedGoogleEmail: emailInput.trim(),
-    });
+    await linkGoogleAccount(activeProfile.id, `g-${Date.now()}`, emailInput.trim());
     setShowEmailModal(false);
     setLastSyncTime(new Date().toLocaleTimeString());
   };
 
-  const handleDisconnectGoogle = () => {
+  const handleDisconnectGoogle = async () => {
     if (activeProfile) {
-      updateProfile(activeProfile.id, {
-        linkedGoogleEmail: undefined,
-      });
+      await unlinkGoogleAccount(activeProfile.id);
       setLastSyncTime(null);
     }
   };

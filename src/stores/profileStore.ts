@@ -1,44 +1,38 @@
 import { create } from 'zustand';
-import { UserProfile } from '@/types';
+import { CreateProfileInput, UpdateProfileInput, UserProfile } from '@/types';
 import { api } from '@/services/tauri';
 
 interface ProfileState {
   profiles: UserProfile[];
   activeProfile: UserProfile | null;
   isLoading: boolean;
-  loadProfilesFromDb: () => Promise<void>;
+  loadProfilesFromDb: () => Promise<UserProfile[]>;
   setProfiles: (profiles: UserProfile[]) => void;
-  setActiveProfile: (profile: UserProfile) => void;
-  createProfile: (displayName: string, avatarPath?: string) => Promise<UserProfile>;
+  setActiveProfile: (profile: UserProfile | null) => void;
+  unloadActiveProfile: () => void;
+  createProfile: (input: CreateProfileInput) => Promise<UserProfile>;
+  updateProfileDetails: (input: UpdateProfileInput) => Promise<UserProfile>;
   deleteProfile: (id: string) => Promise<void>;
-  updateProfile: (id: string, updates: Partial<UserProfile>) => void;
+  setDefaultProfile: (id: string) => Promise<void>;
+  linkGoogleAccount: (profileId: string, googleAccountId: string, googleEmail: string) => Promise<void>;
+  unlinkGoogleAccount: (profileId: string) => Promise<void>;
 }
 
-const DEFAULT_PROFILE: UserProfile = {
-  id: 'default-profile-uuid',
-  displayName: 'Player 1',
-  avatarPath: '',
-  isDefault: true,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
-
 export const useProfileStore = create<ProfileState>((set, get) => ({
-  profiles: [DEFAULT_PROFILE],
-  activeProfile: DEFAULT_PROFILE,
+  profiles: [],
+  activeProfile: null,
   isLoading: false,
 
   loadProfilesFromDb: async () => {
+    set({ isLoading: true });
     try {
       const list = await api.listProfiles();
-      if (list && list.length > 0) {
-        set({
-          profiles: list,
-          activeProfile: list.find((p) => p.isDefault) || list[0],
-        });
-      }
+      set({ profiles: list, isLoading: false });
+      return list;
     } catch (e) {
       console.warn('Could not fetch profiles from SQLite:', e);
+      set({ isLoading: false });
+      return [];
     }
   },
 
@@ -46,19 +40,28 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
   setActiveProfile: (profile) => set({ activeProfile: profile }),
 
-  createProfile: async (displayName, avatarPath) => {
+  unloadActiveProfile: () => {
+    set({ activeProfile: null });
+  },
+
+  createProfile: async (input) => {
     try {
-      const created = await api.createProfile(displayName, avatarPath);
+      const created = await api.createFullProfile(input);
       set((state) => ({
         profiles: [...state.profiles, created],
       }));
       return created;
-    } catch {
+    } catch (err) {
+      console.warn('Backend create profile failed, fallback:', err);
       const fallback: UserProfile = {
         id: `profile-${Date.now()}`,
-        displayName,
-        avatarPath,
-        isDefault: false,
+        displayName: input.displayName,
+        avatarPath: input.avatarPath,
+        isDefault: get().profiles.length === 0,
+        authenticationEnabled: input.authType !== 'none',
+        authType: input.authType || 'none',
+        themePreference: input.themePreference || 'dark',
+        preferredController: input.preferredController,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -66,6 +69,84 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         profiles: [...state.profiles, fallback],
       }));
       return fallback;
+    }
+  },
+
+  updateProfileDetails: async (input) => {
+    try {
+      const updated = await api.updateUserProfile(input);
+      set((state) => {
+        const nextList = state.profiles.map((p) => (p.id === input.id ? updated : p));
+        const nextActive = state.activeProfile?.id === input.id ? updated : state.activeProfile;
+        return { profiles: nextList, activeProfile: nextActive };
+      });
+      return updated;
+    } catch (err) {
+      console.warn('Backend update failed:', err);
+      const existing = get().profiles.find((p) => p.id === input.id);
+      if (existing) {
+        const updated: UserProfile = {
+          ...existing,
+          displayName: input.displayName || existing.displayName,
+          avatarPath: input.avatarPath !== undefined ? input.avatarPath : existing.avatarPath,
+          themePreference: input.themePreference || existing.themePreference,
+          preferredController: input.preferredController !== undefined ? input.preferredController : existing.preferredController,
+          updatedAt: new Date().toISOString(),
+        };
+        set((state) => ({
+          profiles: state.profiles.map((p) => (p.id === input.id ? updated : p)),
+          activeProfile: state.activeProfile?.id === input.id ? updated : state.activeProfile,
+        }));
+        return updated;
+      }
+      throw err;
+    }
+  },
+
+  setDefaultProfile: async (id) => {
+    try {
+      await api.setDefaultProfile(id);
+      set((state) => ({
+        profiles: state.profiles.map((p) => ({ ...p, isDefault: p.id === id })),
+      }));
+    } catch (e) {
+      console.warn('Set default profile error:', e);
+    }
+  },
+
+  linkGoogleAccount: async (profileId, googleAccountId, googleEmail) => {
+    try {
+      await api.linkGoogleAccount(profileId, googleAccountId, googleEmail);
+      set((state) => {
+        const updated = state.profiles.map((p) =>
+          p.id === profileId ? { ...p, linkedGoogleEmail: googleEmail } : p
+        );
+        const active =
+          state.activeProfile?.id === profileId
+            ? { ...state.activeProfile, linkedGoogleEmail: googleEmail }
+            : state.activeProfile;
+        return { profiles: updated, activeProfile: active };
+      });
+    } catch (e) {
+      console.warn('Link Google error:', e);
+    }
+  },
+
+  unlinkGoogleAccount: async (profileId) => {
+    try {
+      await api.unlinkGoogleAccount(profileId);
+      set((state) => {
+        const updated = state.profiles.map((p) =>
+          p.id === profileId ? { ...p, linkedGoogleEmail: undefined } : p
+        );
+        const active =
+          state.activeProfile?.id === profileId
+            ? { ...state.activeProfile, linkedGoogleEmail: undefined }
+            : state.activeProfile;
+        return { profiles: updated, activeProfile: active };
+      });
+    } catch (e) {
+      console.warn('Unlink Google error:', e);
     }
   },
 
@@ -80,21 +161,8 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     const remaining = profiles.filter((p) => p.id !== id);
     let nextActive = activeProfile;
     if (activeProfile?.id === id) {
-      nextActive = remaining[0];
+      nextActive = null;
     }
     set({ profiles: remaining, activeProfile: nextActive });
-  },
-
-  updateProfile: (id, updates) => {
-    set((state) => {
-      const updated = state.profiles.map((p) =>
-        p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
-      );
-      const nextActive =
-        state.activeProfile?.id === id
-          ? { ...state.activeProfile, ...updates, updatedAt: new Date().toISOString() }
-          : state.activeProfile;
-      return { profiles: updated, activeProfile: nextActive };
-    });
   },
 }));

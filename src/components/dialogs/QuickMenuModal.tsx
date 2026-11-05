@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigationStore } from '@/stores/navigationStore';
+import { useStartupStore } from '@/stores/startupStore';
 import {
   Gamepad2,
   Save,
@@ -9,10 +10,12 @@ import {
   Maximize2,
   X,
   Play,
+  LogOut,
 } from 'lucide-react';
 
 export const QuickMenuModal: React.FC = () => {
   const { quickMenuOpen, setQuickMenuOpen, setCurrentTab, toggleFullscreen } = useNavigationStore();
+  const { switchProfileRequest } = useStartupStore();
 
   if (!quickMenuOpen) return null;
 
@@ -22,6 +25,14 @@ export const QuickMenuModal: React.FC = () => {
       icon: Play,
       action: () => setQuickMenuOpen(false),
       highlight: true,
+    },
+    {
+      label: 'Switch Player Profile',
+      icon: LogOut,
+      action: () => {
+        setQuickMenuOpen(false);
+        switchProfileRequest();
+      },
     },
     {
       label: 'My Games Library',
@@ -48,7 +59,7 @@ export const QuickMenuModal: React.FC = () => {
       },
     },
     {
-      label: 'User Profiles',
+      label: 'User Profiles & Settings',
       icon: Users,
       action: () => {
         setCurrentTab('profiles');

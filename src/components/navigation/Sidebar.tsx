@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { useProfileStore } from '@/stores/profileStore';
+import { useStartupStore } from '@/stores/startupStore';
 import { NavigationTab } from '@/types';
 import {
   LayoutDashboard,
@@ -19,6 +20,7 @@ import {
   Power,
   Maximize2,
   Sparkles,
+  LogOut,
 } from 'lucide-react';
 
 interface NavItem {
@@ -133,18 +135,26 @@ export const Sidebar: React.FC = () => {
         <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 flex items-center justify-between">
           <button
             onClick={() => {
+              setSidebarExpanded(false);
+              useStartupStore.getState().switchProfileRequest();
+            }}
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-500/40 text-xs text-slate-300 hover:text-rose-400 font-semibold transition-all"
+            title="Switch Active Profile"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-400" />
+            <span>Switch Profile</span>
+          </button>
+
+          <button
+            onClick={() => {
               toggleFullscreen();
               setSidebarExpanded(false);
             }}
-            className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 font-semibold transition-all"
+            className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 font-semibold transition-all"
           >
             <Maximize2 className="w-3.5 h-3.5 text-sky-400" />
             <span>Fullscreen</span>
           </button>
-
-          <span className="text-[11px] text-slate-500 font-mono">
-            Universal Game Hub v0.1.2
-          </span>
         </div>
       </aside>
     </>

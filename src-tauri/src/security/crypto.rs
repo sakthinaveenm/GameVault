@@ -101,5 +101,46 @@ mod tests {
         let wrong_key_res = BackupCrypto::decrypt_file(&enc_file, &dec_file, "WrongPassphrase");
         assert!(wrong_key_res.is_err());
     }
+
+    #[test]
+    fn test_password_hasher_verification() {
+        let secret = "1234";
+        let salt = PasswordHasher::generate_salt();
+        let hash = PasswordHasher::hash_credential(secret, &salt);
+
+        assert!(PasswordHasher::verify_credential(secret, &salt, &hash));
+        assert!(!PasswordHasher::verify_credential("0000", &salt, &hash));
+    }
 }
+
+pub struct PasswordHasher;
+
+impl PasswordHasher {
+    pub fn generate_salt() -> String {
+        uuid::Uuid::new_v4().to_string().replace('-', "")
+    }
+
+    pub fn hash_credential(secret: &str, salt: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(salt.as_bytes());
+        hasher.update(secret.as_bytes());
+        let mut current = hasher.finalize();
+
+        // 20,000 rounds of key stretching
+        for _ in 0..20_000 {
+            let mut h = Sha256::new();
+            h.update(&current);
+            h.update(salt.as_bytes());
+            current = h.finalize();
+        }
+
+        format!("{:x}", current)
+    }
+
+    pub fn verify_credential(secret: &str, salt: &str, expected_hash: &str) -> bool {
+        let computed = Self::hash_credential(secret, salt);
+        computed == expected_hash
+    }
+}
+
 

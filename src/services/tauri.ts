@@ -1,5 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
-import { UserProfile, ControllerInfo, Game, Emulator, SaveSnapshot } from '@/types';
+import {
+  UserProfile,
+  ControllerInfo,
+  Game,
+  Emulator,
+  SaveSnapshot,
+  CreateProfileInput,
+  UpdateProfileInput,
+  AuthVerificationResult,
+  StartupDiagnostics,
+  CloudProfileSummary,
+} from '@/types';
 
 export const isTauriEnvironment = (): boolean => {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -85,6 +96,156 @@ export const api = {
       return await invoke<string>('ping');
     }
     return 'pong (web mode)';
+  },
+
+  initStartupDiagnostics: async (): Promise<StartupDiagnostics> => {
+    if (isTauriEnvironment()) {
+      return await invoke<StartupDiagnostics>('init_startup_diagnostics');
+    }
+    return {
+      configReady: true,
+      databaseReady: true,
+      profilesCount: 1,
+      defaultProfileId: 'default-profile-uuid',
+      connectedControllersCount: 0,
+      appVersion: '0.1.2',
+      appDataDir: './data',
+    };
+  },
+
+  verifyProfileCredentials: async (
+    profileId: string,
+    secret: string
+  ): Promise<AuthVerificationResult> => {
+    if (isTauriEnvironment()) {
+      return await invoke<AuthVerificationResult>('verify_profile_credentials', {
+        profileId,
+        secret,
+      });
+    }
+    const ok = secret === '1234' || secret.length >= 4;
+    return {
+      success: ok,
+      remainingAttempts: ok ? 5 : 3,
+      lockedOut: false,
+      message: ok ? undefined : 'Incorrect credentials.',
+    };
+  },
+
+  createFullProfile: async (
+    input: CreateProfileInput
+  ): Promise<UserProfile> => {
+    if (isTauriEnvironment()) {
+      return await invoke<UserProfile>('create_full_profile', { input });
+    }
+    return {
+      id: `prof-${Date.now()}`,
+      displayName: input.displayName,
+      avatarPath: input.avatarPath,
+      isDefault: false,
+      authenticationEnabled: input.authType !== 'none',
+      authType: (input.authType || 'none') as 'none' | 'pin' | 'password',
+      themePreference: input.themePreference || 'dark',
+      preferredController: input.preferredController,
+      syncProfileId: `sync-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  },
+
+  updateUserProfile: async (
+    input: UpdateProfileInput
+  ): Promise<UserProfile> => {
+    if (isTauriEnvironment()) {
+      return await invoke<UserProfile>('update_user_profile', { input });
+    }
+    return {
+      id: input.id,
+      displayName: input.displayName || 'Player',
+      avatarPath: input.avatarPath,
+      isDefault: false,
+      authenticationEnabled: !input.removeAuth,
+      authType: (input.authType || 'none') as 'none' | 'pin' | 'password',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  },
+
+  setDefaultProfile: async (id: string): Promise<void> => {
+    if (isTauriEnvironment()) {
+      await invoke('set_default_profile', { id });
+    }
+  },
+
+  linkGoogleAccount: async (
+    profileId: string,
+    googleAccountId: string,
+    googleEmail: string
+  ): Promise<void> => {
+    if (isTauriEnvironment()) {
+      await invoke('link_google_account', {
+        profileId,
+        googleAccountId,
+        googleEmail,
+      });
+    }
+  },
+
+  unlinkGoogleAccount: async (profileId: string): Promise<void> => {
+    if (isTauriEnvironment()) {
+      await invoke('unlink_google_account', { profileId });
+    }
+  },
+
+  listCloudProfiles: async (googleEmail: string): Promise<CloudProfileSummary[]> => {
+    if (isTauriEnvironment()) {
+      return await invoke<CloudProfileSummary[]>('list_cloud_profiles', {
+        googleEmail,
+      });
+    }
+    return [
+      {
+        syncProfileId: 'sync-browser-profile-1',
+        displayName: `${googleEmail.split('@')[0]} (Cloud Profile)`,
+        avatarPath: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80',
+        lastSyncedAt: new Date().toISOString(),
+        gameCount: 6,
+        backupSizeBytes: 32_450_000,
+        deviceName: 'Cloud Gaming Node',
+      },
+    ];
+  },
+
+  recoverCloudProfile: async (
+    cloudProfileId: string,
+    localDisplayName: string,
+    googleEmail: string
+  ): Promise<UserProfile> => {
+    if (isTauriEnvironment()) {
+      return await invoke<UserProfile>('recover_cloud_profile', {
+        cloudProfileId,
+        localDisplayName,
+        googleEmail,
+      });
+    }
+    return {
+      id: `prof-${Date.now()}`,
+      displayName: localDisplayName,
+      avatarPath: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80',
+      isDefault: true,
+      linkedGoogleEmail: googleEmail,
+      syncProfileId: cloudProfileId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  },
+
+  exitApplication: async (): Promise<void> => {
+    if (isTauriEnvironment()) {
+      await invoke('exit_application');
+    } else {
+      console.log('[Browser Mode] Exit application simulated.');
+    }
   },
 
   listProfiles: async (): Promise<UserProfile[]> => {

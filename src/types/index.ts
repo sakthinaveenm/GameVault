@@ -47,10 +47,78 @@ export interface UserProfile {
   displayName: string;
   avatarPath?: string;
   isDefault: boolean;
+  authenticationEnabled?: boolean;
+  authType?: 'none' | 'pin' | 'password';
+  themePreference?: string;
+  preferredController?: string;
+  syncProfileId?: string;
   linkedGoogleEmail?: string;
+  lastPlayedGame?: string;
+  lastPlayedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
+
+export interface CreateProfileInput {
+  displayName: string;
+  avatarPath?: string;
+  authType?: 'none' | 'pin' | 'password';
+  pin?: string;
+  password?: string;
+  themePreference?: string;
+  preferredController?: string;
+}
+
+export interface UpdateProfileInput {
+  id: string;
+  displayName?: string;
+  avatarPath?: string;
+  authType?: string;
+  newPin?: string;
+  newPassword?: string;
+  removeAuth?: boolean;
+  themePreference?: string;
+  preferredController?: string;
+}
+
+export interface AuthVerificationResult {
+  success: boolean;
+  remainingAttempts: number;
+  lockedOut: boolean;
+  message?: string;
+}
+
+export interface StartupDiagnostics {
+  configReady: boolean;
+  databaseReady: boolean;
+  profilesCount: number;
+  defaultProfileId?: string;
+  connectedControllersCount: number;
+  appVersion: string;
+  appDataDir: string;
+}
+
+export interface CloudProfileSummary {
+  syncProfileId: string;
+  displayName: string;
+  avatarPath?: string;
+  lastSyncedAt: string;
+  gameCount: number;
+  backupSizeBytes: number;
+  deviceName: string;
+}
+
+export type StartupState =
+  | 'Initializing'
+  | 'DatabaseReady'
+  | 'LoadingProfiles'
+  | 'ProfileSelection'
+  | 'CreatingProfile'
+  | 'AuthenticatingProfile'
+  | 'LoadingProfile'
+  | 'DashboardReady'
+  | 'RecoveringProfile'
+  | 'Error';
 
 export interface Emulator {
   id: string;
