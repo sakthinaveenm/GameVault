@@ -21,3 +21,4 @@ CREATE TABLE IF NOT EXISTS torrent_tasks (
 
 CREATE INDEX IF NOT EXISTS idx_torrent_tasks_hash ON torrent_tasks(info_hash);
 CREATE INDEX IF NOT EXISTS idx_torrent_tasks_state ON torrent_tasks(state);
+
