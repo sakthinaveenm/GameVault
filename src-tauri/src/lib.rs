@@ -90,6 +90,14 @@ pub fn run() {
             commands::queue_download,
             commands::execute_downloaded_installer,
             commands::generate_oauth_pkce,
+            commands::add_torrent_task,
+            commands::list_torrent_tasks,
+            commands::pause_torrent_task,
+            commands::resume_torrent_task,
+            commands::delete_torrent_task,
+            commands::update_torrent_task_progress,
+            commands::open_in_external_torrent_client,
+            commands::open_torrent_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Universal Game Hub");

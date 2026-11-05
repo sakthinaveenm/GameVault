@@ -3,6 +3,7 @@ import { StoreGame } from '@/types/store';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useNavigationStore } from '@/stores/navigationStore';
 import { useProfileStore } from '@/stores/profileStore';
+import { api } from '@/services/tauri';
 import { Game } from '@/types';
 import {
   X,
@@ -85,16 +86,56 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
     setIsAdded(true);
   };
 
-  const handleQueueDownload = () => {
+  const parseRepackBytes = (repackSize?: string): number => {
+    if (!repackSize) return 21474836480;
+    const match = repackSize.match(/([\d.]+)\s*GB/i);
+    if (match) {
+      return Math.round(parseFloat(match[1]) * 1024 * 1024 * 1024);
+    }
+    const mbMatch = repackSize.match(/([\d.]+)\s*MB/i);
+    if (mbMatch) {
+      return Math.round(parseFloat(mbMatch[1]) * 1024 * 1024);
+    }
+    return 21474836480;
+  };
+
+  const handleQueueDownload = async () => {
     setIsDownloading(true);
-    setTimeout(() => {
+    const estimatedBytes = parseRepackBytes(game.metadata.repackSize);
+
+    try {
+      if (game.magnetUrl && game.magnetUrl.length > 0) {
+        await api.addTorrentTask(game.magnetUrl[0].magnetUrl, game.name, undefined, estimatedBytes);
+      } else {
+        await api.queueDownload(game.name, game.pageUrl || 'https://fitgirl-repacks.site', `~/Downloads/${game.name}`);
+      }
+      if (!isAlreadyInLibrary) {
+        await handleAddToLibrary();
+      }
+      setTimeout(() => {
+        setIsDownloading(false);
+        setCurrentTab('downloads');
+        onClose();
+      }, 500);
+    } catch (err: any) {
+      console.warn('Queue download failed:', err);
       setIsDownloading(false);
-      alert(
-        `Added "${game.name}" (${game.metadata.repackSize || 'Ready'}) to Download queue!\nCheck the Downloads tab in the top navigation.`
-      );
+      alert(`Could not start download: ${err?.message || err}`);
+    }
+  };
+
+  const handleDownloadSpecificTorrent = async (magnetUrl: string, title: string) => {
+    const estimatedBytes = parseRepackBytes(game.metadata.repackSize);
+    try {
+      await api.addTorrentTask(magnetUrl, `${game.name} (${title})`, undefined, estimatedBytes);
+      if (!isAlreadyInLibrary) {
+        await handleAddToLibrary();
+      }
       setCurrentTab('downloads');
       onClose();
-    }, 600);
+    } catch (err: any) {
+      alert(`Could not queue torrent: ${err?.message || err}`);
+    }
   };
 
   const nextImage = () => {
@@ -356,13 +397,15 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
                           )}
                         </button>
 
-                        <a
-                          href={mirror.magnetUrl}
-                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all shadow-sm"
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadSpecificTorrent(mirror.magnetUrl, mirror.title)}
+                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+                          title="Queue Torrent in Download Manager"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          <span>Open</span>
-                        </a>
+                          <span>Download</span>
+                        </button>
                       </div>
                     </div>
                   );

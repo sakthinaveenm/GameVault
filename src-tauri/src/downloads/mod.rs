@@ -1,3 +1,7 @@
+pub mod torrent;
+
+pub use torrent::{ParsedMagnet, TorrentManager, TorrentTask};
+
 use crate::database::DbPool;
 use crate::errors::AppError;
 use crate::games::launcher::GameLauncher;

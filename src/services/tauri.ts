@@ -10,6 +10,7 @@ import {
   AuthVerificationResult,
   StartupDiagnostics,
   CloudProfileSummary,
+  TorrentTask,
 } from '@/types';
 
 export const isTauriEnvironment = (): boolean => {
@@ -60,6 +61,48 @@ export interface PkceSessionDto {
   code_verifier: string;
   code_challenge: string;
   state: string;
+}
+
+export interface TorrentTaskDto {
+  id: string;
+  info_hash: string;
+  name: string;
+  magnet_uri: string;
+  save_path: string;
+  total_bytes: number;
+  downloaded_bytes: number;
+  uploaded_bytes: number;
+  download_speed: number;
+  upload_speed: number;
+  progress: number;
+  peers: number;
+  seeds: number;
+  state: 'queued' | 'connecting' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
+  trackers_json?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function mapTorrentTask(dto: TorrentTaskDto): TorrentTask {
+  return {
+    id: dto.id,
+    infoHash: dto.info_hash,
+    name: dto.name,
+    magnetUri: dto.magnet_uri,
+    savePath: dto.save_path,
+    totalBytes: dto.total_bytes,
+    downloadedBytes: dto.downloaded_bytes,
+    uploadedBytes: dto.uploaded_bytes,
+    downloadSpeed: dto.download_speed,
+    uploadSpeed: dto.upload_speed,
+    progress: dto.progress,
+    peers: dto.peers,
+    seeds: dto.seeds,
+    state: dto.state,
+    trackersJson: dto.trackers_json,
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
+  };
 }
 
 export interface SystemInfoDto {
@@ -489,5 +532,122 @@ export const api = {
       code_challenge: 'simulated_pkce_challenge_abcdef123456',
       state: 'simulated-state-uuid',
     };
+  },
+
+  addTorrentTask: async (
+    magnetUri: string,
+    customName?: string,
+    savePath?: string,
+    totalBytes?: number
+  ): Promise<TorrentTask> => {
+    if (isTauriEnvironment()) {
+      const dto = await invoke<TorrentTaskDto>('add_torrent_task', {
+        magnetUri,
+        customName: customName || null,
+        savePath: savePath || null,
+        totalBytes: totalBytes || null,
+      });
+      return mapTorrentTask(dto);
+    }
+    const safeName = customName || 'Torrent Download';
+    return {
+      id: `sim-torrent-${Date.now()}`,
+      infoHash: '5ea0f2bb95a2f71f1f7b433045bcb43d3ef7cd4b',
+      name: safeName,
+      magnetUri,
+      savePath: `~/Downloads/UniversalGameHub/Torrents/${safeName}`,
+      totalBytes: totalBytes || 21474836480,
+      downloadedBytes: 104857600,
+      uploadedBytes: 20971520,
+      downloadSpeed: 15728640,
+      uploadSpeed: 1048576,
+      progress: 0.5,
+      peers: 28,
+      seeds: 64,
+      state: 'downloading',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  },
+
+  listTorrentTasks: async (): Promise<TorrentTask[]> => {
+    if (isTauriEnvironment()) {
+      const list = await invoke<TorrentTaskDto[]>('list_torrent_tasks');
+      return list.map(mapTorrentTask);
+    }
+    return [];
+  },
+
+  pauseTorrentTask: async (id: string): Promise<void> => {
+    if (isTauriEnvironment()) {
+      await invoke('pause_torrent_task', { id });
+    }
+  },
+
+  resumeTorrentTask: async (id: string): Promise<void> => {
+    if (isTauriEnvironment()) {
+      await invoke('resume_torrent_task', { id });
+    }
+  },
+
+  deleteTorrentTask: async (id: string, deleteFiles: boolean): Promise<void> => {
+    if (isTauriEnvironment()) {
+      await invoke('delete_torrent_task', { id, deleteFiles });
+    }
+  },
+
+  updateTorrentTaskProgress: async (
+    id: string,
+    downloadedBytes: number,
+    totalBytes: number,
+    downloadSpeed: number,
+    uploadSpeed: number,
+    seeds: number,
+    peers: number
+  ): Promise<TorrentTask> => {
+    if (isTauriEnvironment()) {
+      const dto = await invoke<TorrentTaskDto>('update_torrent_task_progress', {
+        id,
+        downloadedBytes,
+        totalBytes,
+        downloadSpeed,
+        uploadSpeed,
+        seeds,
+        peers,
+      });
+      return mapTorrentTask(dto);
+    }
+    return {
+      id,
+      infoHash: 'simulated_hash',
+      name: 'Simulated Update',
+      magnetUri: '',
+      savePath: '',
+      totalBytes,
+      downloadedBytes,
+      uploadedBytes: 0,
+      downloadSpeed,
+      uploadSpeed,
+      progress: (downloadedBytes / totalBytes) * 100,
+      peers,
+      seeds,
+      state: downloadedBytes >= totalBytes ? 'completed' : 'downloading',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  },
+
+  openInExternalTorrentClient: async (magnetUri: string): Promise<void> => {
+    if (isTauriEnvironment()) {
+      await invoke('open_in_external_torrent_client', { magnetUri });
+    } else {
+      window.open(magnetUri, '_blank');
+    }
+  },
+
+  openTorrentFolder: async (path: string): Promise<void> => {
+    if (isTauriEnvironment()) {
+      await invoke('open_torrent_folder', { path });
+    }
   },
 };

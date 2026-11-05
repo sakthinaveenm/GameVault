@@ -178,6 +178,26 @@ export interface DownloadItem {
   error?: string;
 }
 
+export interface TorrentTask {
+  id: string;
+  infoHash: string;
+  name: string;
+  magnetUri: string;
+  savePath: string;
+  totalBytes: number;
+  downloadedBytes: number;
+  uploadedBytes: number;
+  downloadSpeed: number;
+  uploadSpeed: number;
+  progress: number;
+  peers: number;
+  seeds: number;
+  state: 'queued' | 'connecting' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
+  trackersJson?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ControllerInfo {
   index: number;
   id: string;

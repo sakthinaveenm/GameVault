@@ -2,7 +2,7 @@ use crate::batocera::{BatoceraClient, BatoceraNodeInfo};
 use crate::cloud::oauth::{OAuthManager, PkceSession};
 use crate::controllers::{ControllerDevice, ControllerInputEvent, ControllerManager};
 use crate::database::DbPool;
-use crate::downloads::{DownloadItem, DownloadManager};
+use crate::downloads::{DownloadItem, DownloadManager, TorrentManager, TorrentTask};
 use crate::emulators::EmulatorRunner;
 use crate::errors::AppError;
 use crate::games::launcher::GameLauncher;
@@ -411,4 +411,92 @@ pub fn execute_downloaded_installer(
 #[tauri::command]
 pub fn generate_oauth_pkce() -> PkceSession {
     OAuthManager::generate_pkce()
+}
+
+#[tauri::command]
+pub async fn add_torrent_task(
+    pool: tauri::State<'_, DbPool>,
+    magnet_uri: String,
+    custom_name: Option<String>,
+    save_path: Option<String>,
+    total_bytes: Option<i64>,
+) -> Result<TorrentTask, AppError> {
+    TorrentManager::add_torrent(
+        &pool,
+        &magnet_uri,
+        custom_name.as_deref(),
+        save_path.as_deref(),
+        total_bytes,
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn list_torrent_tasks(
+    pool: tauri::State<'_, DbPool>,
+) -> Result<Vec<TorrentTask>, AppError> {
+    TorrentManager::list_torrents(&pool).await
+}
+
+#[tauri::command]
+pub async fn pause_torrent_task(
+    pool: tauri::State<'_, DbPool>,
+    id: String,
+) -> Result<(), AppError> {
+    TorrentManager::pause_torrent(&pool, &id).await
+}
+
+#[tauri::command]
+pub async fn resume_torrent_task(
+    pool: tauri::State<'_, DbPool>,
+    id: String,
+) -> Result<(), AppError> {
+    TorrentManager::resume_torrent(&pool, &id).await
+}
+
+#[tauri::command]
+pub async fn delete_torrent_task(
+    pool: tauri::State<'_, DbPool>,
+    id: String,
+    delete_files: bool,
+) -> Result<(), AppError> {
+    TorrentManager::delete_torrent(&pool, &id, delete_files).await
+}
+
+#[tauri::command]
+pub async fn update_torrent_task_progress(
+    pool: tauri::State<'_, DbPool>,
+    id: String,
+    downloaded_bytes: i64,
+    total_bytes: i64,
+    download_speed: i64,
+    upload_speed: i64,
+    seeds: i64,
+    peers: i64,
+) -> Result<TorrentTask, AppError> {
+    TorrentManager::update_progress(
+        &pool,
+        &id,
+        downloaded_bytes,
+        total_bytes,
+        download_speed,
+        upload_speed,
+        seeds,
+        peers,
+    )
+    .await
+}
+
+#[tauri::command]
+pub fn open_in_external_torrent_client(
+    magnet_uri: String,
+) -> Result<(), AppError> {
+    TorrentManager::open_in_external_client(&magnet_uri)
+}
+
+#[tauri::command]
+pub fn open_torrent_folder(
+    path: String,
+) -> Result<(), AppError> {
+    TorrentManager::open_torrent_folder(&path)
 }
