@@ -21,6 +21,9 @@ import {
   Tag,
   Monitor,
   Flame,
+  Copy,
+  Check,
+  Link2,
 } from 'lucide-react';
 
 interface StoreGameModalProps {
@@ -36,8 +39,17 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isAdded, setIsAdded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [copiedMagnetIndex, setCopiedMagnetIndex] = useState<number | null>(null);
 
   if (!game) return null;
+
+  const handleCopyMagnet = (magnetUrl: string, index: number) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(magnetUrl);
+      setCopiedMagnetIndex(index);
+      setTimeout(() => setCopiedMagnetIndex(null), 2000);
+    }
+  };
 
   const allImages = game.images && game.images.length > 0 ? game.images : [game.logo];
   const activeImage = allImages[activeImageIndex] || game.logo;
@@ -296,6 +308,65 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Magnet / Torrent Links */}
+          {game.magnetUrl && game.magnetUrl.length > 0 && (
+            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+              <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center space-x-2">
+                <Link2 className="w-4 h-4 text-emerald-400" />
+                <span>P2P Repack Mirrors ({game.magnetUrl.length})</span>
+              </h3>
+              <div className="space-y-2">
+                {game.magnetUrl.map((mirror, idx) => {
+                  const isCopied = copiedMagnetIndex === idx;
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                        <span className="text-xs font-bold text-slate-200 capitalize truncate">
+                          {mirror.title || `Magnet Mirror #${idx + 1}`}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono truncate hidden sm:inline">
+                          {mirror.magnetUrl.slice(0, 45)}...
+                        </span>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMagnet(mirror.magnetUrl, idx)}
+                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all border border-slate-700"
+                        >
+                          {isCopied ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-400">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 text-sky-400" />
+                              <span>Copy URI</span>
+                            </>
+                          )}
+                        </button>
+
+                        <a
+                          href={mirror.magnetUrl}
+                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all shadow-sm"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Open</span>
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

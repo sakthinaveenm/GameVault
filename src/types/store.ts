@@ -14,6 +14,11 @@ export interface StoreGameSpecifications {
   recommended?: string | null;
 }
 
+export interface StoreGameMagnet {
+  title: string;
+  magnetUrl: string;
+}
+
 export interface StoreGame {
   id: number | string;
   rank?: number;
@@ -26,6 +31,7 @@ export interface StoreGame {
   metadata: StoreGameMetadata;
   specifications?: StoreGameSpecifications;
   paragraphs?: string[];
+  magnetUrl?: StoreGameMagnet[];
 }
 
 export interface StoreApiResponse {
