@@ -400,11 +400,20 @@ export const StoreGameModal: React.FC<StoreGameModalProps> = ({ game, onClose })
                         <button
                           type="button"
                           onClick={() => handleDownloadSpecificTorrent(mirror.magnetUrl, mirror.title)}
-                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
                           title="Queue Torrent in Download Manager"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          <span>Download</span>
+                          <span>Download Torrent</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => api.openInExternalTorrentClient(mirror.magnetUrl)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all border border-slate-700"
+                          title="Open in System Torrent Client"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>

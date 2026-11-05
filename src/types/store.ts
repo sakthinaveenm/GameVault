@@ -32,6 +32,7 @@ export interface StoreGame {
   specifications?: StoreGameSpecifications;
   paragraphs?: string[];
   magnetUrl?: StoreGameMagnet[];
+  magneturl?: string | StoreGameMagnet[];
 }
 
 export interface StoreApiResponse {

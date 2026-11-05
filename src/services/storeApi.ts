@@ -1,4 +1,4 @@
-import { StoreApiResponse, StoreGame } from '@/types/store';
+import { StoreApiResponse, StoreGame, StoreGameMagnet } from '@/types/store';
 import { MOCK_STORE_GAMES } from '@/data/mockStoreGames';
 
 const STORE_API_URL = 'https://game-backend-api-7dx4.onrender.com/api/games';
@@ -15,6 +15,32 @@ export interface StoreFetchResult {
   error?: string;
 }
 
+export function normalizeStoreGame(rawGame: any): StoreGame {
+  let magnetList: StoreGameMagnet[] = [];
+  const rawMagnet = rawGame.magnetUrl || rawGame.magneturl || rawGame.magnet_url;
+
+  if (Array.isArray(rawMagnet)) {
+    magnetList = rawMagnet
+      .map((m: any, idx: number) => {
+        if (typeof m === 'string') {
+          return { title: `Mirror #${idx + 1}`, magnetUrl: m.trim() };
+        }
+        return {
+          title: m.title || `Mirror #${idx + 1}`,
+          magnetUrl: (m.magnetUrl || m.magneturl || m.url || '').trim(),
+        };
+      })
+      .filter((m: StoreGameMagnet) => Boolean(m.magnetUrl && m.magnetUrl.startsWith('magnet:?')));
+  } else if (typeof rawMagnet === 'string' && rawMagnet.trim().startsWith('magnet:?')) {
+    magnetList = [{ title: 'Main Magnet Mirror', magnetUrl: rawMagnet.trim() }];
+  }
+
+  return {
+    ...rawGame,
+    magnetUrl: magnetList,
+  };
+}
+
 export async function fetchStoreCatalog(forceRefresh: boolean = false): Promise<StoreFetchResult> {
   // 1. Check local cache if not forcing refresh
   if (!forceRefresh && typeof window !== 'undefined') {
@@ -27,9 +53,10 @@ export async function fetchStoreCatalog(forceRefresh: boolean = false): Promise<
         if (age < CACHE_TTL_MS) {
           const parsed = JSON.parse(cachedData) as StoreApiResponse;
           if (parsed && Array.isArray(parsed.games) && parsed.games.length > 0) {
+            const normalized = parsed.games.map(normalizeStoreGame);
             return {
-              games: parsed.games,
-              totalGames: parsed.totalGames || parsed.games.length,
+              games: normalized,
+              totalGames: parsed.totalGames || normalized.length,
               source: parsed.source || STORE_API_URL,
               scrapedAt: parsed.scrapedAt,
               isFromCache: true,
@@ -63,17 +90,22 @@ export async function fetchStoreCatalog(forceRefresh: boolean = false): Promise<
     const data: StoreApiResponse = await response.json();
 
     if (data && Array.isArray(data.games) && data.games.length > 0) {
+      const normalizedGames = data.games.map(normalizeStoreGame);
+
       // Save to localStorage cache
       try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({ ...data, games: normalizedGames })
+        );
         localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
       } catch (err) {
         console.warn('LocalStorage store cache quota warning:', err);
       }
 
       return {
-        games: data.games,
-        totalGames: data.totalGames || data.games.length,
+        games: normalizedGames,
+        totalGames: data.totalGames || normalizedGames.length,
         source: data.source || STORE_API_URL,
         scrapedAt: data.scrapedAt,
         isFromCache: false,
@@ -91,9 +123,10 @@ export async function fetchStoreCatalog(forceRefresh: boolean = false): Promise<
         if (cachedData) {
           const parsed = JSON.parse(cachedData) as StoreApiResponse;
           if (parsed && Array.isArray(parsed.games) && parsed.games.length > 0) {
+            const normalized = parsed.games.map(normalizeStoreGame);
             return {
-              games: parsed.games,
-              totalGames: parsed.totalGames || parsed.games.length,
+              games: normalized,
+              totalGames: parsed.totalGames || normalized.length,
               source: parsed.source || STORE_API_URL,
               scrapedAt: parsed.scrapedAt,
               isFromCache: true,
@@ -107,13 +140,13 @@ export async function fetchStoreCatalog(forceRefresh: boolean = false): Promise<
     }
 
     // 4. Ultimate fallback: static mock data
+    const fallbackNormalized = MOCK_STORE_GAMES.map(normalizeStoreGame);
     return {
-      games: MOCK_STORE_GAMES,
-      totalGames: MOCK_STORE_GAMES.length,
+      games: fallbackNormalized,
+      totalGames: fallbackNormalized.length,
       source: 'Offline Fallback Catalog',
       isFromCache: true,
       error: err?.message || 'Using bundled catalog',
     };
   }
 }
-
